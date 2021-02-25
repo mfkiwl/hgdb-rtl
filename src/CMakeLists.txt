@@ -1,3 +1,5 @@
 add_library(hgdb-rtl rtl.cc)
-target_link_libraries(hgdb-rtl libslang)
-target_include_directories(hgdb-rtl PRIVATE ../extern/slang/include)
+target_link_libraries(hgdb-rtl PRIVATE slangcompiler)
+target_include_directories(hgdb-rtl PUBLIC ../extern/slang/include
+        ../extern/slang/external/
+        ${CMAKE_CURRENT_BINARY_DIR}/../extern/slang/source)
