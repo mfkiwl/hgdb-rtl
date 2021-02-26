@@ -1,7 +1,8 @@
+#include <memory>
+
 #include "../extern/slang/include/slang/syntax/SyntaxTree.h"
 #include "../src/rtl.hh"
 #include "gtest/gtest.h"
-#include <memory>
 
 class TestDesignDatabase : public ::testing::Test {
 protected:
@@ -15,19 +16,45 @@ protected:
     std::unique_ptr<hgdb::rtl::DesignDatabase> design_;
 };
 
-TEST_F(TestDesignDatabase, parse_connection) {  // NOLINT
+TEST_F(TestDesignDatabase, select) {  // NOLINT
     load_str(R"(
 module child (
-    input logic a, b
+    input logic a, b,
     output logic c
 );
+logic d;
 endmodule
 module top;
     logic a, b, c;
-    childl inst (.*);
+    child inst (.*);
 endmodule
 )");
 
-    auto const *p = design_->select("top");
+    auto const *p = design_->select("top.inst.a");
     EXPECT_NE(p, nullptr);
+
+    auto const *inst = design_->select("top");
+    EXPECT_NE(inst, nullptr);
+
+    inst = design_->select("top.inst");
+    EXPECT_NE(inst, nullptr);
+    EXPECT_EQ(inst->name, "inst");
+
+    auto const *inst_symbol = design_->get_instance("top.inst");
+    EXPECT_NE(inst_symbol, nullptr);
+}
+
+TEST_F(TestDesignDatabase, port_connections) {  // NOLINT
+    load_str(R"(
+module child (
+    input logic a, b, c,
+    output logic d
+);
+endmodule
+module top;
+    logic a, b, d;
+    child inst (.*, .c(a + b));
+endmodule
+)");
+
 }
