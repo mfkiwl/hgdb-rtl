@@ -4,11 +4,11 @@
 #include <stack>
 
 #include "fmt/format.h"
+#include "slang/binding/OperatorExpressions.h"
 #include "slang/symbols/ASTVisitor.h"
 #include "slang/symbols/InstanceSymbols.h"
 #include "slang/symbols/PortSymbols.h"
 #include "slang/symbols/VariableSymbols.h"
-#include "slang/binding/OperatorExpressions.h"
 
 namespace hgdb::rtl {
 
@@ -35,36 +35,35 @@ const slang::InstanceSymbol *DesignDatabase::get_instance(const std::string &pat
 }
 
 // visitor that collect all symbols
-class SymbolExprVisitor: public slang::ASTVisitor<SymbolExprVisitor, false, true> {
+class SymbolExprVisitor {
 public:
     explicit SymbolExprVisitor(std::vector<const slang::Symbol *> &symbols) : symbols_(symbols) {}
 
-    template<typename T>
-    void handle(const T &symbol) {
-        handleDefault(symbol);
-    }
-
-    template<typename T>
-    void handleDefault(const T& symbol) {
+    template <typename T>
+    void visit(const T &symbol) {
         if constexpr (std::is_base_of<slang::Symbol, T>::value) {
-           symbols_.emplace_back(&symbol);
+            symbols_.emplace_back(&symbol);
+        } else if constexpr (std::is_base_of<slang::Expression, T>::value) {
+            if constexpr (std::is_same<slang::Expression, T>::value) {
+                symbol.template visit(*this);
+            } else if constexpr (std::is_same<slang::BinaryExpression, T>::value ||
+                                 std::is_same<slang::ConditionalExpression, T>::value) {
+                visit(symbol.left());
+                visit(symbol.right());
+            } else if constexpr (std::is_same<slang::NamedValueExpression, T>::value) {
+                symbols_.emplace_back(&symbol.symbol);
+            } else if constexpr (std::is_same<slang::UnaryExpression, T>::value) {
+                visit(symbol.operand());
+            } else if constexpr (std::is_same<slang::ConcatenationExpression, T>::value) {
+                for (auto const *s : symbol.operands()) {
+                    visit(s);
+                }
+            }
         }
-        if constexpr (slang::is_detected_v<visitExprs_t, T, SymbolExprVisitor>) {
-            symbol.visitExprs(*this);
-        }
     }
 
-    void handle(const slang::Expression &expr) {
-        handleDefault(expr);
-    }
-
-    void handle(const slang::BinaryExpression &symbol) {
-        handleDefault(symbol);
-    }
-
-    void handle(const slang::NamedValueExpression &expr) {
-        handleDefault(expr);
-    }
+    template <typename T>
+    [[maybe_unused]] void visitInvalid(const T &) {}
 
 private:
     std::vector<const slang::Symbol *> &symbols_;
@@ -90,6 +89,13 @@ std::vector<const slang::Symbol *> DesignDatabase::get_connected_symbols(
     if (!slang::PortSymbol::isKind(p->kind)) return {};
     auto const &port = p->as<slang::PortSymbol>();
     return get_connected_symbols(instance, &port);
+}
+
+std::vector<const slang::Symbol *> DesignDatabase::get_connected_symbols(
+    const std::string &path, const std::string &port_name) {
+    if (instances_.find(path) == instances_.end()) return {};
+    auto const *inst = instances_.at(path);
+    return get_connected_symbols(inst, port_name);
 }
 
 class InstanceVisitor {

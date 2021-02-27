@@ -59,5 +59,7 @@ endmodule
 
     auto const *inst = design_->get_instance("top.inst");
     auto connections = design_->get_connected_symbols(inst, "c");
-    EXPECT_FALSE(connections.empty());
+    EXPECT_EQ(connections.size(), 2);
+    connections = design_->get_connected_symbols("top.inst", "a");
+    EXPECT_EQ(connections.size(), 1);
 }

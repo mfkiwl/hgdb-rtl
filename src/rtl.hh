@@ -17,6 +17,8 @@ public:
         const slang::InstanceSymbol *instance, const slang::PortSymbol *port);
     static std::vector<const slang::Symbol *> get_connected_symbols(
         const slang::InstanceSymbol *instance, const std::string &port_name);
+    std::vector<const slang::Symbol *> get_connected_symbols(const std::string &path,
+                                                             const std::string &port_name);
 
 private:
     slang::Compilation &compilation_;
