@@ -8,6 +8,7 @@
 #include "slang/symbols/InstanceSymbols.h"
 #include "slang/symbols/PortSymbols.h"
 #include "slang/symbols/VariableSymbols.h"
+#include "slang/binding/OperatorExpressions.h"
 
 namespace hgdb::rtl {
 
@@ -34,19 +35,36 @@ const slang::InstanceSymbol *DesignDatabase::get_instance(const std::string &pat
 }
 
 // visitor that collect all symbols
-class SymbolExprVisitor {
+class SymbolExprVisitor: public slang::ASTVisitor<SymbolExprVisitor, false, true> {
 public:
     explicit SymbolExprVisitor(std::vector<const slang::Symbol *> &symbols) : symbols_(symbols) {}
 
-    template <typename T>
-    void visit(const T &elem) {
+    template<typename T>
+    void handle(const T &symbol) {
+        handleDefault(symbol);
+    }
+
+    template<typename T>
+    void handleDefault(const T& symbol) {
         if constexpr (std::is_base_of<slang::Symbol, T>::value) {
-            symbols_.emplace_back(&elem);
-        } else if constexpr (std::is_base_of<slang::Expression, T>::value) {
-            elem.visit(*this);
+           symbols_.emplace_back(&symbol);
+        }
+        if constexpr (slang::is_detected_v<visitExprs_t, T, SymbolExprVisitor>) {
+            symbol.visitExprs(*this);
         }
     }
-    void visitInvalid(const slang::Expression &) {}
+
+    void handle(const slang::Expression &expr) {
+        handleDefault(expr);
+    }
+
+    void handle(const slang::BinaryExpression &symbol) {
+        handleDefault(symbol);
+    }
+
+    void handle(const slang::NamedValueExpression &expr) {
+        handleDefault(expr);
+    }
 
 private:
     std::vector<const slang::Symbol *> &symbols_;
@@ -59,10 +77,19 @@ std::vector<const slang::Symbol *> DesignDatabase::get_connected_symbols(
         auto const *other = conn->expr;
         std::vector<const slang::Symbol *> symbols;
         SymbolExprVisitor visitor(symbols);
-        visitor.visit(*other->getSymbolReference());
+        visitor.visit(*other);
         return symbols;
     }
     return {};
+}
+
+std::vector<const slang::Symbol *> DesignDatabase::get_connected_symbols(
+    const slang::InstanceSymbol *instance, const std::string &port_name) {
+    auto const *p = instance->body.findPort(port_name);
+    if (!p) return {};
+    if (!slang::PortSymbol::isKind(p->kind)) return {};
+    auto const &port = p->as<slang::PortSymbol>();
+    return get_connected_symbols(instance, &port);
 }
 
 class InstanceVisitor {
