@@ -135,7 +135,7 @@ public:
                 auto const &instance = elem.template as<slang::InstanceSymbol>();
 
                 auto const &body = instance.body;
-                auto const &name = body.name;
+                auto const &name = instance.name;
                 auto instance_name = get_hierarchy_name(instance.name);
                 instances_.emplace(instance_name, &instance);
                 // push to stack
