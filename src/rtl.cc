@@ -37,7 +37,8 @@ const slang::InstanceSymbol *DesignDatabase::get_instance(const std::string &pat
 // visitor that collect all symbols
 class SymbolExprVisitor {
 public:
-    explicit SymbolExprVisitor(std::vector<const slang::ValueSymbol *> &symbols) : symbols_(symbols) {}
+    explicit SymbolExprVisitor(std::vector<const slang::ValueSymbol *> &symbols)
+        : symbols_(symbols) {}
 
     template <typename T>
     void visit(const T &symbol) {
@@ -108,16 +109,18 @@ std::string DesignDatabase::get_instance_path(const slang::InstanceSymbol *symbo
     return result;
 }
 
-bool DesignDatabase::instance_inside(const slang::InstanceSymbol *child, const slang::InstanceSymbol *parent) {
-    // there are two approaches, we could just use hierarchy path to figure out if they overlap
-    // completely. but for performance reason we do simple looping
-    const slang::Scope *scope = child->getParentScope();
-    while (scope != nullptr) {
-        auto const *scope_symbol = &scope->asSymbol();
-        if (scope_symbol == &parent->body) {
-            return true;
+bool DesignDatabase::instance_inside(const slang::InstanceSymbol *child,
+                                     const slang::InstanceSymbol *parent) {
+    // there are two approaches. the easiest way is just to compare their hierarchy path
+    if (!child || !parent) return false;
+    auto child_inst_name = get_instance_path(child);
+    auto parent_inst_name = get_instance_path(parent);
+    auto pos = child_inst_name.find(parent_inst_name);
+    if (pos != std::string::npos) {
+        // has to have a dot afterwards
+        if (child_inst_name.length() > parent_inst_name.length()) {
+            return child_inst_name[parent_inst_name.length()] == '.';
         }
-        scope = scope_symbol->getParentScope();
     }
     return false;
 }
