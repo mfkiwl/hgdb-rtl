@@ -37,11 +37,11 @@ const slang::InstanceSymbol *DesignDatabase::get_instance(const std::string &pat
 // visitor that collect all symbols
 class SymbolExprVisitor {
 public:
-    explicit SymbolExprVisitor(std::vector<const slang::Symbol *> &symbols) : symbols_(symbols) {}
+    explicit SymbolExprVisitor(std::vector<const slang::ValueSymbol *> &symbols) : symbols_(symbols) {}
 
     template <typename T>
     void visit(const T &symbol) {
-        if constexpr (std::is_base_of<slang::Symbol, T>::value) {
+        if constexpr (std::is_base_of<slang::ValueSymbol, T>::value) {
             symbols_.emplace_back(&symbol);
         } else if constexpr (std::is_base_of<slang::Expression, T>::value) {
             if constexpr (std::is_same<slang::Expression, T>::value) {
@@ -66,15 +66,15 @@ public:
     [[maybe_unused]] void visitInvalid(const T &) {}
 
 private:
-    std::vector<const slang::Symbol *> &symbols_;
+    std::vector<const slang::ValueSymbol *> &symbols_;
 };
 
-std::vector<const slang::Symbol *> DesignDatabase::get_connected_symbols(
+std::vector<const slang::ValueSymbol *> DesignDatabase::get_connected_symbols(
     const slang::InstanceSymbol *instance, const slang::PortSymbol *port) {
     auto const *conn = instance->getPortConnection(*port);
     if (conn) {
         auto const *other = conn->expr;
-        std::vector<const slang::Symbol *> symbols;
+        std::vector<const slang::ValueSymbol *> symbols;
         SymbolExprVisitor visitor(symbols);
         visitor.visit(*other);
         return symbols;
@@ -82,7 +82,7 @@ std::vector<const slang::Symbol *> DesignDatabase::get_connected_symbols(
     return {};
 }
 
-std::vector<const slang::Symbol *> DesignDatabase::get_connected_symbols(
+std::vector<const slang::ValueSymbol *> DesignDatabase::get_connected_symbols(
     const slang::InstanceSymbol *instance, const std::string &port_name) {
     auto const *p = instance->body.findPort(port_name);
     if (!p) return {};
@@ -91,11 +91,35 @@ std::vector<const slang::Symbol *> DesignDatabase::get_connected_symbols(
     return get_connected_symbols(instance, &port);
 }
 
-std::vector<const slang::Symbol *> DesignDatabase::get_connected_symbols(
+std::vector<const slang::ValueSymbol *> DesignDatabase::get_connected_symbols(
     const std::string &path, const std::string &port_name) {
     if (instances_.find(path) == instances_.end()) return {};
     auto const *inst = instances_.at(path);
     return get_connected_symbols(inst, port_name);
+}
+
+std::string DesignDatabase::get_instance_definition_name(const slang::InstanceSymbol *symbol) {
+    return std::string(symbol->getDefinition().name);
+}
+
+std::string DesignDatabase::get_instance_path(const slang::InstanceSymbol *symbol) {
+    std::string result;
+    symbol->getHierarchicalPath(result);
+    return result;
+}
+
+bool DesignDatabase::instance_inside(const slang::InstanceSymbol *child, const slang::InstanceSymbol *parent) {
+    // there are two approaches, we could just use hierarchy path to figure out if they overlap
+    // completely. but for performance reason we do simple looping
+    const slang::Scope *scope = child->getParentScope();
+    while (scope != nullptr) {
+        auto const *scope_symbol = &scope->asSymbol();
+        if (scope_symbol == &parent->body) {
+            return true;
+        }
+        scope = scope_symbol->getParentScope();
+    }
+    return false;
 }
 
 class InstanceVisitor {

@@ -63,3 +63,61 @@ endmodule
     connections = design_->get_connected_symbols("top.inst", "a");
     EXPECT_EQ(connections.size(), 1);
 }
+
+TEST_F(TestDesignDatabase, instance_definition) {  // NOLINT
+    load_str(R"(
+module child1;
+endmodule
+module child2;
+child1 inst1();
+endmodule
+module top;
+child1 inst1();
+child2 inst2();
+endmodule
+)");
+
+    auto const *inst = design_->get_instance("top.inst1");
+    EXPECT_EQ(design_->get_instance_definition_name(inst), "child1");
+    inst = design_->get_instance("top.inst2");
+    EXPECT_EQ(design_->get_instance_definition_name(inst), "child2");
+    inst = design_->get_instance("top.inst1");
+    EXPECT_EQ(design_->get_instance_definition_name(inst), "child1");
+}
+
+TEST_F(TestDesignDatabase, get_instance_path) {  // NOLINT
+    auto constexpr inst_path = "top.inst1";
+    load_str(R"(
+module child1;
+endmodule
+module top;
+child1 inst1();
+endmodule
+)");
+
+    auto const *inst = design_->get_instance(inst_path);
+    EXPECT_NE(inst, nullptr);
+    auto path = design_->get_instance_path(inst);
+    EXPECT_EQ(path, inst_path);
+}
+
+TEST_F(TestDesignDatabase, is_inside) {  // NOLINT
+    load_str(R"(
+module child1;
+endmodule
+module child2;
+child1 inst1();
+endmodule
+module top;
+child1 inst1();
+child2 inst2();
+endmodule
+)");
+
+    auto const *inst1 = design_->get_instance("top.inst1");
+    auto const *inst2 = design_->get_instance("top");
+    EXPECT_TRUE(design_->instance_inside(inst1, inst2));
+    auto const *inst3 = design_->get_instance("top.inst2.inst1");
+    EXPECT_TRUE(design_->instance_inside(inst3, inst2));
+    EXPECT_FALSE(design_->instance_inside(inst3, inst1));
+}
