@@ -65,9 +65,7 @@ public:
         }
     }
 
-    void visitExpr(const slang::Expression &expr) {
-        expr.visit(*this);
-    }
+    void visitExpr(const slang::Expression &expr) { expr.visit(*this); }
 
     template <typename T>
     [[maybe_unused]] void visitInvalid(const T &) {}
@@ -179,16 +177,29 @@ std::set<const slang::InstanceSymbol *> DesignDatabase::get_connected_instance(
     const slang::InstanceSymbol *target_instance, const slang::PortSymbol *port,
     slang::ArgumentDirection direction) {
     std::set<const slang::InstanceSymbol *> result;
-    if (port->direction == direction) {
-        // this is an input port
-        auto port_symbols = get_connected_symbols(target_instance, port);
-        // notice that we need to get the instance symbols
-        for (auto const *s : port_symbols) {
-            // depends on the type of the symbol, we need to compute different things
-            // if it is a variable, then we see if it's used to connected to another
-            // instance
-            // if it's a port, then it has to be connected through outside
-            if (slang::VariableSymbol::isKind(s->kind)) {
+    // if direction doesn't match
+    if (port->direction != direction) return result;
+    // this is an input port
+    auto port_symbols = get_connected_symbols(target_instance, port);
+    // notice that we need to get the instance symbols
+    for (auto const *s : port_symbols) {
+        // depends on the type of the symbol, we need to compute different things
+        // if it is a variable, then we see if it's used to connected to another
+        // instance
+        // if it's a port, then it has to be connected through outside
+        if (slang::VariableSymbol::isKind(s->kind)) {
+            // test if it's a port or not
+            if (target_instance->body.findPort(s->name)) {
+                // legal SystemVerilog only allows parent's port to be connected,
+                // if the connection is a port
+                if (hierarchy_map_.find(target_instance) == hierarchy_map_.end()) {
+                    continue;
+                }
+                auto const *parent = hierarchy_map_.at(target_instance);
+                if (&parent->body == &s->getParentScope()->asSymbol()) {
+                    result.emplace(parent);
+                }
+            } else {
                 auto const &var = s->as<slang::VariableSymbol>();
                 // need to find if it's connected to any instances
                 // we use a visitor to find that connection
@@ -205,6 +216,7 @@ std::set<const slang::InstanceSymbol *> DesignDatabase::get_connected_instance(
             }
         }
     }
+
     return result;
 }
 

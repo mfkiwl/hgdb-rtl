@@ -123,15 +123,17 @@ endmodule
     EXPECT_FALSE(design_->instance_inside(inst3, inst1));
 }
 
-TEST_F(TestDesignDatabase, get_source_instances) {  // NOLINT
+TEST_F(TestDesignDatabase, get_source_instances_var) {  // NOLINT
     load_str(R"(
 module mod1 (
   input logic a, b, c,
-  output logic d);
+  output logic d
+);
 endmodule
 module mod2 (
   input a,
-  output b);
+  output b
+);
 endmodule
 module top;
 logic l1, l2, l3, l4, l5;
@@ -157,4 +159,29 @@ endmodule
     auto const *inst5 = design_->get_instance("top.inst5");
     EXPECT_EQ(sinks.size(), 1);
     EXPECT_EQ(*sinks.begin(), inst5);
+}
+
+
+TEST_F(TestDesignDatabase, get_source_instance_port) {  // NOLINT
+    load_str(R"(
+module mod (
+  input logic a,
+  output logic d
+);
+endmodule
+module top (
+input logic a,
+output logic d
+);
+mod dut (.*);
+endmodule
+)");
+    auto const *dut = design_->get_instance("top.dut");
+    auto const *top = design_->get_instance("top");
+    auto source = design_->get_source_instances(dut);
+    EXPECT_EQ(source.size(), 1);
+    EXPECT_EQ(*source.begin(), top);
+    auto sinks = design_->get_sink_instances(dut);
+    EXPECT_EQ(sinks.size(), 1);
+    EXPECT_EQ(*sinks.begin(), top);
 }
