@@ -3,6 +3,7 @@
 #include "../extern/slang/include/slang/syntax/SyntaxTree.h"
 #include "../src/rtl.hh"
 #include "gtest/gtest.h"
+#include "fmt/format.h"
 
 class TestDesignDatabase : public ::testing::Test {
 protected:
@@ -120,4 +121,40 @@ endmodule
     auto const *inst3 = design_->get_instance("top.inst2.inst1");
     EXPECT_TRUE(design_->instance_inside(inst3, inst2));
     EXPECT_FALSE(design_->instance_inside(inst3, inst1));
+}
+
+TEST_F(TestDesignDatabase, get_source_instances) {  // NOLINT
+    load_str(R"(
+module mod1 (
+  input logic a, b, c,
+  output logic d);
+endmodule
+module mod2 (
+  input a,
+  output b);
+endmodule
+module top;
+logic l1, l2, l3, l4, l5;
+mod2 inst1(1'b1, l1);
+mod2 inst2(1'b1, l2);
+mod2 inst3(1'b1, l3);
+mod1 inst4(l1, l2, l3, l4);
+mod2 inst5(l4, l5);
+endmodule
+)");
+
+    auto const *inst4 = design_->get_instance("top.inst4");
+    auto sources = design_->get_source_instances(inst4);
+    EXPECT_EQ(sources.size(), 3);
+
+    for (auto i = 1; i < 4; i++) {
+        auto name = fmt::format("top.inst{0}", i);
+        auto const *inst = design_->get_instance(name);
+        EXPECT_NE(inst, nullptr);
+        EXPECT_NE(std::find(sources.begin(), sources.end(), inst), sources.end());
+    }
+    auto sinks = design_->get_sink_instances(inst4);
+    auto const *inst5 = design_->get_instance("top.inst5");
+    EXPECT_EQ(sinks.size(), 1);
+    EXPECT_EQ(*sinks.begin(), inst5);
 }
