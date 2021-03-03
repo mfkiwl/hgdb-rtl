@@ -81,8 +81,12 @@ std::unique_ptr<slang::Compilation> RTL::compile() const {
     return std::move(compilation);
 }
 
+std::unique_ptr<Selector> RTL::get_selector(py::handle handle) {
+    return std::unique_ptr<Selector>();
+}
+
 void init_rtl(py::module& m) {
-    py::class_<RTL, DataSource>(m, "RTL")
+    py::class_<RTL, DataSource, std::shared_ptr<RTL>>(m, "RTL")
         .def(py::init<>())
         .def("add_include_dir", &RTL::add_include_dir, py::arg("path"))
         .def("add_system_include_dir", &RTL::add_system_include_dir, py::arg("path"))
