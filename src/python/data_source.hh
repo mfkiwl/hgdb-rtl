@@ -32,41 +32,6 @@ public:
     virtual void on_added(Ooze *) {}
 };
 
-class RTL : public DataSource {
-public:
-    inline RTL() : DataSource(DataSourceType::RTL) {}
-    // methods to add files to the compilation unit
-    inline void add_include_dir(const std::string &path) { include_dirs.emplace_back(path); }
-    inline void add_system_include_dir(const std::string &path) {
-        include_sys_dirs_.emplace_back(path);
-    }
-    inline void add_file(const std::string &path) { files_.emplace_back(path); }
-    inline void add_macro(const std::string &name, const std::string &value) {
-        macros_.emplace(name, value);
-    }
-    inline void set_top(const std::string &top) { top_ = top; }
-
-    [[nodiscard]] std::unique_ptr<slang::Compilation> compile() const;
-
-    [[nodiscard]] inline std::vector<py::handle> provides() const override {
-        return {py::type::of<InstanceObject>(), py::type::of<VariableObject>(),
-                py::type::of<PortObject>()};
-    }
-
-    std::unique_ptr<Selector> get_selector(py::handle handle) override;
-
-    inline void on_added(Ooze *) override { compilation_ = compile(); }
-
-private:
-    std::vector<std::string> include_dirs;
-    std::vector<std::string> include_sys_dirs_;
-    std::vector<std::string> files_;
-    std::map<std::string, std::string> macros_;
-    std::string top_;
-
-    // the compilation object
-    std::unique_ptr<slang::Compilation> compilation_;
-};
 
 class Ooze {
 public:

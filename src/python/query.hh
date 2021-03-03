@@ -3,11 +3,9 @@
 
 #include "object.hh"
 
-class Selector: QueryObject {
+class Selector : QueryObject {};
 
-};
-
-class SelectorQueryArray: QueryArray {
+class SelectorQueryArray : QueryArray {
 public:
     std::vector<std::unique_ptr<Selector>> selectors_;
 };
