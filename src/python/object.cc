@@ -24,7 +24,7 @@ std::unique_ptr<InstanceObject> get_parent_instance(const T &obj) {
 }
 
 void init_instance_object(py::module &m) {
-    auto cls = py::class_<InstanceObject, QueryObject>(m, "Instance");
+    auto cls = py::class_<InstanceObject, RTLQueryObject>(m, "Instance");
     // we don't allow users to construct it by themself
     cls.def_property_readonly(
            "name", [](const InstanceObject &obj) { return std::string(obj.instance->name); })
@@ -35,7 +35,7 @@ void init_instance_object(py::module &m) {
                                    return name;
                                })
         .def("__eq__",
-             [](const InstanceObject &obj, const QueryObject &other) {
+             [](const InstanceObject &obj, const RTLQueryObject &other) {
                  auto const *o = dynamic_cast<const InstanceObject *>(&other);
                  if (o) {
                      return o->instance == obj.instance;
@@ -57,7 +57,7 @@ void init_instance_object(py::module &m) {
 }
 
 void init_variable_object(py::module &m) {
-    auto cls = py::class_<VariableObject, QueryObject>(m, "Variable");
+    auto cls = py::class_<VariableObject, RTLQueryObject>(m, "Variable");
     cls.def_property_readonly("name", [](const VariableObject &obj) { return obj.variable->name; })
         .def_property_readonly("instance",
                                [](const VariableObject &obj) -> std::unique_ptr<InstanceObject> {
@@ -87,13 +87,12 @@ void init_port_object(py::module &m) {
 }
 
 void init_query_array(py::module &m) {
-    auto cls = py::class_<QueryArray, QueryObject>(m, "QueryArray");
+    auto cls = py::class_<RTLQueryArray, RTLQueryObject>(m, "RTLQueryArray");
     // implement array interface
-    cls.def("__len__", [](const QueryArray &array) { return array.list.size(); })
-        .def("__getitem__", [](const QueryArray &array, uint64_t index) {
+    cls.def("__len__", [](const RTLQueryArray &array) { return array.list.size(); })
+        .def("__getitem__", [](const RTLQueryArray &array, uint64_t index) {
             if (index >= array.list.size()) {
-                throw std::out_of_range(
-                    fmt::format("Array size: {0}. Index: {1}", array.list.size(), index));
+                throw py::index_error();
             }
             return array.list[index];
         });

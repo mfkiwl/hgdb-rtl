@@ -10,32 +10,38 @@
 
 struct QueryObject {
 public:
-    explicit QueryObject(hgdb::rtl::DesignDatabase *db) : db(db) {}
-    hgdb::rtl::DesignDatabase *db;
     virtual ~QueryObject() = default;
 };
 
-struct QueryArray : QueryObject {
+struct QueryArray : public QueryObject {};
+
+struct RTLQueryObject {
 public:
-    template <typename T>
-    QueryArray(hgdb::rtl::DesignDatabase *db, const T &begin, const T &end)
-        : QueryObject(db), list(begin, end) {}
-    hgdb::rtl::DesignDatabase *db = nullptr;
-    std::vector<QueryObject> list;
+    explicit RTLQueryObject(hgdb::rtl::DesignDatabase *db) : db(db) {}
+    hgdb::rtl::DesignDatabase *db;
 };
 
-struct InstanceObject : public QueryObject {
+struct RTLQueryArray : QueryArray, RTLQueryObject {
+public:
+    template <typename T>
+    RTLQueryArray(hgdb::rtl::DesignDatabase *db, const T &begin, const T &end)
+        : RTLQueryObject(db), list(begin, end) {}
+    hgdb::rtl::DesignDatabase *db = nullptr;
+    std::vector<RTLQueryObject> list;
+};
+
+struct InstanceObject : public RTLQueryObject {
 public:
     InstanceObject(hgdb::rtl::DesignDatabase *db, const slang::InstanceSymbol *instance)
-        : QueryObject(db), instance(instance) {}
+        : RTLQueryObject(db), instance(instance) {}
     // this holds instance information
     const slang::InstanceSymbol *instance;
 };
 
-struct VariableObject : public QueryObject {
+struct VariableObject : public RTLQueryObject {
 public:
     VariableObject(hgdb::rtl::DesignDatabase *db, const slang::ValueSymbol *variable)
-        : QueryObject(db), variable(variable) {}
+        : RTLQueryObject(db), variable(variable) {}
     const slang::ValueSymbol *variable;
 };
 

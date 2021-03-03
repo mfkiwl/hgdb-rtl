@@ -73,9 +73,8 @@ public:
     Ooze() = default;
     void add_source(const std::shared_ptr<DataSource> &source);
 
-private:
-    std::vector<std::shared_ptr<DataSource>> sources_;
-    std::map<py::handle, std::function<std::unique_ptr<Selector>(py::handle)>> selector_providers_;
+    std::vector<std::shared_ptr<DataSource>> sources;
+    std::map<py::handle, std::function<std::unique_ptr<Selector>(py::handle)>> selector_providers;
 };
 
 void init_data_source(py::module &m);
