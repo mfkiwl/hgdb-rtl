@@ -28,15 +28,21 @@ public:
         const slang::InstanceSymbol *instance);
     std::set<const slang::InstanceSymbol *> get_sink_instances(
         const slang::InstanceSymbol *instance);
-    const slang::InstanceSymbol *get_parent_instance(const slang::Symbol* symbol);
+    const slang::InstanceSymbol *get_parent_instance(const slang::Symbol *symbol);
+
+    const std::vector<const slang::VariableSymbol *> &variables() const { return variables_; }
+    const std::vector<const slang::InstanceSymbol *> &instances() const { return instances_; }
+    const std::vector<const slang::PortSymbol *> &ports() const { return ports_; }
 
 private:
     slang::Compilation &compilation_;
-    std::unordered_map<std::string, const slang::InstanceSymbol *> instances_;
-    std::unordered_map<const slang::InstanceSymbol *, const slang::InstanceSymbol *>
-        hierarchy_map_;
+    std::unordered_map<std::string, const slang::InstanceSymbol *> instances_map_;
+    std::unordered_map<const slang::InstanceSymbol *, const slang::InstanceSymbol *> hierarchy_map_;
+    std::vector<const slang::InstanceSymbol *> instances_;
+    std::vector<const slang::PortSymbol *> ports_;
+    std::vector<const slang::VariableSymbol *> variables_;
 
-    void index_instance();
+    void index_values();
     std::set<const slang::InstanceSymbol *> get_connected_instance(
         const slang::InstanceSymbol *target_instance, const slang::PortSymbol *port,
         slang::ArgumentDirection direction);

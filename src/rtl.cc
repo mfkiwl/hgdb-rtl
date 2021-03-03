@@ -14,13 +14,13 @@
 namespace hgdb::rtl {
 
 DesignDatabase::DesignDatabase(slang::Compilation &compilation) : compilation_(compilation) {
-    index_instance();
+    index_values();
 }
 
 const slang::Symbol *DesignDatabase::select(const std::string &path) {
     // if we've already computed the instance, use it
-    if (instances_.find(path) != instances_.end()) {
-        return instances_.at(path);
+    if (instances_map_.find(path) != instances_map_.end()) {
+        return instances_map_.at(path);
     } else {
         auto const &root = compilation_.getRoot();
         return root.lookupName(path);
@@ -28,8 +28,8 @@ const slang::Symbol *DesignDatabase::select(const std::string &path) {
 }
 
 const slang::InstanceSymbol *DesignDatabase::get_instance(const std::string &path) {
-    if (instances_.find(path) != instances_.end()) {
-        return instances_.at(path);
+    if (instances_map_.find(path) != instances_map_.end()) {
+        return instances_map_.at(path);
     } else {
         return nullptr;
     }
@@ -98,8 +98,8 @@ std::set<const slang::ValueSymbol *> DesignDatabase::get_connected_symbols(
 
 std::set<const slang::ValueSymbol *> DesignDatabase::get_connected_symbols(
     const std::string &path, const std::string &port_name) {
-    if (instances_.find(path) == instances_.end()) return {};
-    auto const *inst = instances_.at(path);
+    if (instances_map_.find(path) == instances_map_.end()) return {};
+    auto const *inst = instances_map_.at(path);
     return get_connected_symbols(inst, port_name);
 }
 
@@ -256,7 +256,7 @@ std::set<const slang::InstanceSymbol *> DesignDatabase::get_sink_instances(
     return result;
 }
 
-const slang::InstanceSymbol * DesignDatabase::get_parent_instance(const slang::Symbol *symbol) {
+const slang::InstanceSymbol *DesignDatabase::get_parent_instance(const slang::Symbol *symbol) {
     if (!symbol) return nullptr;
     auto const &scope = symbol->getParentScope();
     return get_instance_from_scope(scope);
@@ -311,9 +311,44 @@ private:
     std::stack<const slang::InstanceSymbol *> hierarchy_;
 };
 
-void DesignDatabase::index_instance() {
-    InstanceVisitor visitor(instances_, hierarchy_map_);
+class VariableVisitor {
+public:
+    explicit VariableVisitor(std::vector<const slang::VariableSymbol *> &symbols)
+        : symbols_(symbols) {}
+
+    template <typename T>
+    void visit(const T &sym) {
+        if (slang::VariableSymbol::isKind(sym.kind)) {
+            auto const &s = sym.template as<slang::VariableSymbol>();
+            symbols_.emplace_back(&s);
+        }
+    }
+
+    void visitInst(const slang::InstanceSymbol *inst) {
+        for (auto const &sym : inst->body.members()) {
+            visit(sym);
+        }
+    }
+
+private:
+    std::vector<const slang::VariableSymbol *> &symbols_;
+};
+
+void DesignDatabase::index_values() {
+    InstanceVisitor visitor(instances_map_, hierarchy_map_);
     visitor.visit(compilation_.getRoot());
+
+    instances_.reserve(instances_map_.size());
+    for (auto const &[inst_name, inst] : instances_map_) {
+        auto const &port_list = inst->body.getPortList();
+        for (auto const &p : port_list) {
+            ports_.emplace_back(&(p->as<slang::PortSymbol>()));
+        }
+        // variables as well, using a visitor
+        VariableVisitor v(variables_);
+        v.visitInst(inst);
+        instances_.emplace_back(inst);
+    }
 }
 
 const slang::InstanceSymbol *DesignDatabase::get_instance_from_scope(const slang::Scope *scope) {
@@ -321,7 +356,7 @@ const slang::InstanceSymbol *DesignDatabase::get_instance_from_scope(const slang
     if (!scope) return nullptr;
     auto const &symbol = scope->asSymbol();
     if (slang::InstanceBodySymbol::isKind(symbol.kind)) {
-        for (auto const &instance : instances_) {
+        for (auto const &instance : instances_map_) {
             if (&instance.second->body == &symbol) {
                 return instance.second;
             }

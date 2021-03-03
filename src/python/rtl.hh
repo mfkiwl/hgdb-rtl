@@ -3,14 +3,13 @@
 
 #include "data_source.hh"
 #include "object.hh"
-
 #include "slang/binding/OperatorExpressions.h"
 #include "slang/symbols/ASTVisitor.h"
 #include "slang/symbols/InstanceSymbols.h"
 #include "slang/symbols/PortSymbols.h"
 #include "slang/symbols/VariableSymbols.h"
 
-struct RTLQueryObject: public QueryObject {
+struct RTLQueryObject : public QueryObject {
 public:
     explicit RTLQueryObject(hgdb::rtl::DesignDatabase *db) : db(db) {}
     hgdb::rtl::DesignDatabase *db;
@@ -24,7 +23,7 @@ public:
     hgdb::rtl::DesignDatabase *db = nullptr;
     std::vector<std::shared_ptr<RTLQueryObject>> rtl_list;
     [[nodiscard]] uint64_t size() const override { return rtl_list.size(); }
-    [[nodiscard]] QueryObject* get(uint64_t idx) const override { return rtl_list[idx].get(); }
+    [[nodiscard]] QueryObject *get(uint64_t idx) const override { return rtl_list[idx].get(); }
     void add(const std::shared_ptr<QueryObject> &obj) override;
 };
 
@@ -50,16 +49,28 @@ public:
     const slang::PortSymbol *port = nullptr;
 };
 
-class RTLSelector: Selector {
-public:
-};
-
-class InstanceSelector: RTLSelector {
+class InstanceSelector : public Selector {
 public:
     explicit InstanceSelector(hgdb::rtl::DesignDatabase &db);
 
 private:
     std::vector<std::shared_ptr<InstanceObject>> instances_;
+};
+
+class VariableSelector : public Selector {
+public:
+    explicit VariableSelector(hgdb::rtl::DesignDatabase &db);
+
+private:
+    std::vector<std::shared_ptr<VariableObject>> variables_;
+};
+
+class PortSelector : public Selector {
+public:
+    explicit PortSelector(hgdb::rtl::DesignDatabase &db);
+
+private:
+    std::vector<std::shared_ptr<PortSelector>> ports_;
 };
 
 class RTL : public DataSource {

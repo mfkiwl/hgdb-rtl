@@ -13,6 +13,30 @@
 
 namespace py = pybind11;
 
+InstanceSelector::InstanceSelector(hgdb::rtl::DesignDatabase &db) {
+    auto const &instances = db.instances();
+    instances_.reserve(instances.size());
+    for (auto const *inst : instances) {
+        instances_.emplace_back(std::make_shared<InstanceObject>(&db, inst));
+    }
+}
+
+VariableSelector::VariableSelector(hgdb::rtl::DesignDatabase &db) {
+    auto const &variables = db.variables();
+    variables_.reserve(variables.size());
+    for (auto const *v : variables) {
+        variables_.emplace_back(std::make_shared<VariableObject>(&db, v));
+    }
+}
+
+PortSelector::PortSelector(hgdb::rtl::DesignDatabase &db) {
+    auto const &ports = db.ports();
+    ports_.reserve(ports.size());
+    for (auto const *p : ports) {
+        ports_.emplace_back(std::make_shared<PortObject>(&db, p));
+    }
+}
+
 void RTLQueryArray::add(const std::shared_ptr<QueryObject> &obj) {
     // test if it is an rtl object
     auto *p = obj.get();
@@ -95,7 +119,16 @@ std::unique_ptr<slang::Compilation> RTL::compile() const {
 }
 
 std::shared_ptr<Selector> RTL::get_selector(py::handle handle) {
-    return std::make_shared<Selector>();
+    // based on what type it is
+    if (handle.is(py::type::of<InstanceObject>())) {
+        // create instance selector
+        return std::make_shared<InstanceSelector>(*db_);
+    } else if (handle.is(py::type::of<VariableObject>())) {
+        return std::make_shared<VariableSelector>(*db_);
+    } else if (handle.is(py::type::of<PortObject>())) {
+        return std::make_shared<PortSelector>(*db_);
+    }
+    return nullptr;
 }
 
 void RTL::on_added(Ooze *) {

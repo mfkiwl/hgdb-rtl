@@ -207,3 +207,25 @@ endmodule
     inst = design_->get_parent_instance(top_a);
     EXPECT_EQ(inst, top);
 }
+
+TEST_F(TestDesignDatabase, get_values) {    // NOLINT
+    load_str(R"(
+module mod (
+  input logic a,
+  output logic d
+);
+logic c;
+endmodule
+module top;
+logic a, b;
+mod dut (.*);
+endmodule
+)");
+
+    auto const &instances = design_->instances();
+    auto const &variables = design_->variables();
+    auto const &ports = design_->ports();
+    EXPECT_EQ(instances.size(), 2);
+    EXPECT_EQ(variables.size(), 5);
+    EXPECT_EQ(ports.size(), 2);
+}
