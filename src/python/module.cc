@@ -5,8 +5,7 @@
 
 namespace py = pybind11;
 
-void init_query(py::module &m);
+void init_object(py::module &m);
 
-PYBIND11_MODULE(ooze, m) {
-    init_query(m);
+PYBIND11_MODULE(ooze, m) { init_object(m);
 }
