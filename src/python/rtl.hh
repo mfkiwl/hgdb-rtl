@@ -70,7 +70,7 @@ public:
     explicit PortSelector(hgdb::rtl::DesignDatabase &db);
 
 private:
-    std::vector<std::shared_ptr<PortSelector>> ports_;
+    std::vector<std::shared_ptr<PortObject>> ports_;
 };
 
 class RTL : public DataSource {

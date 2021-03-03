@@ -152,7 +152,8 @@ std::unique_ptr<InstanceObject> get_parent_instance(const T &obj) {
 }
 
 void init_instance_object(py::module &m) {
-    auto cls = py::class_<InstanceObject, RTLQueryObject>(m, "Instance");
+    auto cls =
+        py::class_<InstanceObject, RTLQueryObject, std::shared_ptr<InstanceObject>>(m, "Instance");
     // we don't allow users to construct it by themself
     cls.def_property_readonly(
            "name", [](const InstanceObject &obj) { return std::string(obj.instance->name); })
@@ -185,7 +186,8 @@ void init_instance_object(py::module &m) {
 }
 
 void init_variable_object(py::module &m) {
-    auto cls = py::class_<VariableObject, RTLQueryObject>(m, "Variable");
+    auto cls =
+        py::class_<VariableObject, RTLQueryObject, std::shared_ptr<VariableObject>>(m, "Variable");
     cls.def_property_readonly("name", [](const VariableObject &obj) { return obj.variable->name; })
         .def_property_readonly("instance",
                                [](const VariableObject &obj) -> std::unique_ptr<InstanceObject> {
@@ -198,7 +200,7 @@ void init_variable_object(py::module &m) {
 }
 
 void init_port_object(py::module &m) {
-    auto cls = py::class_<PortObject, VariableObject>(m, "Port");
+    auto cls = py::class_<PortObject, VariableObject, std::shared_ptr<PortObject>>(m, "Port");
     cls.def_property_readonly("direction", [](const PortObject &port) -> std::string {
         switch (port.port->direction) {
             case (slang::ArgumentDirection::In):
