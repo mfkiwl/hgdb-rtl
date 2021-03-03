@@ -3,11 +3,11 @@
 
 #include "object.hh"
 
-class Selector : QueryObject {};
+class Selector : QueryArray {};
 
 class SelectorQueryArray : QueryArray {
 public:
-    std::vector<std::unique_ptr<Selector>> selectors_;
+    std::vector<std::shared_ptr<Selector>> selectors_;
 };
 
 #endif  // HGDB_RTL_QUERY_HH

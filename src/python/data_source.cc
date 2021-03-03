@@ -5,13 +5,14 @@ void Ooze::add_source(const std::shared_ptr<DataSource> &source) {
     sources.emplace_back(source);
     // register selected type
     auto const types = source->provides();
-    auto func = [=](py::handle handle) -> std::unique_ptr<Selector> {
+    auto func = [=](py::handle handle) -> std::shared_ptr<Selector> {
         return source->get_selector(handle);
     };
     for (auto const &t : types) {
         // need to register selector object
         selector_providers.emplace(t, func);
     }
+    source->on_added(this);
 }
 
 void init_data_source(py::module &m) {
@@ -20,7 +21,7 @@ void init_data_source(py::module &m) {
 
     py::class_<Ooze>(m, "Ooze")
         .def("add_source", &Ooze::add_source)
-        .def("select", [](Ooze *ooze, const py::list &types) {
+        .def("select", [](Ooze *ooze, const py::args &types) {
             auto query_array = std::make_unique<SelectorQueryArray>();
             // need to find registered types
             for (auto const &t : types) {
@@ -31,7 +32,7 @@ void init_data_source(py::module &m) {
                 auto selector = select_func(t);
                 if (selector) {
                     // need to add it to the selector
-                    query_array->selectors_.emplace_back(std::move(selector));
+                    query_array->selectors_.emplace_back(selector);
                 }
             }
             return std::move(query_array);

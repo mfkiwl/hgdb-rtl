@@ -20,9 +20,12 @@ struct RTLQueryArray : QueryArray, RTLQueryObject {
 public:
     template <typename T>
     RTLQueryArray(hgdb::rtl::DesignDatabase *db, const T &begin, const T &end)
-        : RTLQueryObject(db), list(begin, end) {}
+        : RTLQueryObject(db), rtl_list(begin, end) {}
     hgdb::rtl::DesignDatabase *db = nullptr;
-    std::vector<RTLQueryObject> list;
+    std::vector<std::shared_ptr<RTLQueryObject>> rtl_list;
+    [[nodiscard]] uint64_t size() const override { return rtl_list.size(); }
+    [[nodiscard]] QueryObject* get(uint64_t idx) const override { return rtl_list[idx].get(); }
+    void add(const std::shared_ptr<QueryObject> &obj) override;
 };
 
 struct InstanceObject : public RTLQueryObject {
@@ -47,6 +50,18 @@ public:
     const slang::PortSymbol *port = nullptr;
 };
 
+class RTLSelector: Selector {
+public:
+};
+
+class InstanceSelector: RTLSelector {
+public:
+    explicit InstanceSelector(hgdb::rtl::DesignDatabase &db);
+
+private:
+    std::vector<std::shared_ptr<InstanceObject>> instances_;
+};
+
 class RTL : public DataSource {
 public:
     inline RTL() : DataSource(DataSourceType::RTL) {}
@@ -68,9 +83,9 @@ public:
                 py::type::of<PortObject>()};
     }
 
-    std::unique_ptr<Selector> get_selector(py::handle handle) override;
+    std::shared_ptr<Selector> get_selector(py::handle handle) override;
 
-    inline void on_added(Ooze *) override { compilation_ = compile(); }
+    inline void on_added(Ooze *) override;
 
 private:
     std::vector<std::string> include_dirs;
@@ -81,6 +96,7 @@ private:
 
     // the compilation object
     std::unique_ptr<slang::Compilation> compilation_;
+    std::unique_ptr<hgdb::rtl::DesignDatabase> db_;
 };
 
 #endif  // HGDB_RTL_PYTHON_RTL_HH
