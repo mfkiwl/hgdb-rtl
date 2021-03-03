@@ -28,6 +28,7 @@ public:
         const slang::InstanceSymbol *instance);
     std::set<const slang::InstanceSymbol *> get_sink_instances(
         const slang::InstanceSymbol *instance);
+    const slang::InstanceSymbol *get_parent_instance(const slang::Symbol* symbol);
 
 private:
     slang::Compilation &compilation_;

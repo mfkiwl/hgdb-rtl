@@ -256,6 +256,12 @@ std::set<const slang::InstanceSymbol *> DesignDatabase::get_sink_instances(
     return result;
 }
 
+const slang::InstanceSymbol * DesignDatabase::get_parent_instance(const slang::Symbol *symbol) {
+    if (!symbol) return nullptr;
+    auto const &scope = symbol->getParentScope();
+    return get_instance_from_scope(scope);
+}
+
 class InstanceVisitor {
 public:
     explicit InstanceVisitor(

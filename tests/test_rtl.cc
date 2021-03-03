@@ -185,3 +185,25 @@ endmodule
     EXPECT_EQ(sinks.size(), 1);
     EXPECT_EQ(*sinks.begin(), top);
 }
+
+TEST_F(TestDesignDatabase, get_parent_instance) {    // NOLINT
+    load_str(R"(
+module mod (
+  input logic a,
+  output logic d
+);
+endmodule
+module top;
+logic a, b;
+mod dut (.*);
+endmodule
+)");
+    auto const *dut = design_->get_instance("top.dut");
+    auto const *top = design_->get_instance("top");
+    auto const *mod_a = design_->select("top.dut.a");
+    auto const *inst = design_->get_parent_instance(mod_a);
+    EXPECT_EQ(inst, dut);
+    auto const *top_a = design_->select("top.a");
+    inst = design_->get_parent_instance(top_a);
+    EXPECT_EQ(inst, top);
+}
