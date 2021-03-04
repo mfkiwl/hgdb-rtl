@@ -96,6 +96,7 @@ std::unique_ptr<slang::Compilation> RTL::compile() const {
     slang::ParserOptions parser_options;
     slang::CompilationOptions compilation_options;
     compilation_options.suppressUnused = true;
+    compilation_options.disableInstanceCaching = true;
     if (!top_.empty()) {
         compilation_options.topModules.emplace(top_);
     }
