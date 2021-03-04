@@ -11,31 +11,35 @@
 
 struct RTLQueryObject : public QueryObject {
 public:
+    RTLQueryObject() = delete;
     explicit RTLQueryObject(hgdb::rtl::DesignDatabase *db) : db(db) {}
     hgdb::rtl::DesignDatabase *db;
 };
 
 struct InstanceObject : public RTLQueryObject {
 public:
+    InstanceObject() = delete;
     InstanceObject(hgdb::rtl::DesignDatabase *db, const slang::InstanceSymbol *instance)
         : RTLQueryObject(db), instance(instance) {}
     // this holds instance information
-    const slang::InstanceSymbol *instance;
+    const slang::InstanceSymbol *instance = nullptr;
 
     [[nodiscard]] std::map<std::string, std::string> values() const override;
 };
 
 struct VariableObject : public RTLQueryObject {
 public:
+    VariableObject() = delete;
     VariableObject(hgdb::rtl::DesignDatabase *db, const slang::ValueSymbol *variable)
         : RTLQueryObject(db), variable(variable) {}
-    const slang::ValueSymbol *variable;
+    const slang::ValueSymbol *variable = nullptr;
 
     [[nodiscard]] std::map<std::string, std::string> values() const override;
 };
 
 struct PortObject : public VariableObject {
 public:
+    PortObject() = delete;
     PortObject(hgdb::rtl::DesignDatabase *db, const slang::PortSymbol *port)
         : VariableObject(db, port), port(port) {}
     const slang::PortSymbol *port = nullptr;

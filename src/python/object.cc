@@ -6,6 +6,7 @@
 
 #include <sstream>
 
+#include "query.hh"
 #include "rtl.hh"
 
 namespace py = pybind11;
@@ -31,6 +32,13 @@ std::shared_ptr<QueryObject> QueryArray::map(
 
 void QueryArray::add(const std::shared_ptr<QueryObject> &obj) { data.emplace_back(obj); }
 
+std::shared_ptr<QueryObject> filter_query_object(
+    const std::shared_ptr<QueryObject> &obj, const std::function<bool(const std::shared_ptr<QueryObject> &)> &func) {
+    auto filter = Filter(func);
+    auto r = filter.apply(obj);
+    return r;
+}
+
 void init_object(py::module &m) {
     auto obj = py::class_<QueryObject, std::shared_ptr<QueryObject>>(m, "QueryObject");
     obj.def("map", &QueryObject::map);
@@ -44,6 +52,23 @@ void init_object(py::module &m) {
         }
         return py::str(dict);
     });
+
+    // the filter part
+    obj.def(
+        "filter",
+        [](const std::shared_ptr<QueryObject> &obj,
+           const std::function<bool(const std::shared_ptr<QueryObject> &)> &func) {
+            return filter_query_object(obj, func);
+        },
+        py::arg("predicate"));
+    // notice that where is the same as filter
+    obj.def(
+        "where",
+        [](const std::shared_ptr<QueryObject> &obj,
+           const std::function<bool(const std::shared_ptr<QueryObject> &)> &func) {
+          return filter_query_object(obj, func);
+        },
+        py::arg("predicate"));
 
     auto array = py::class_<QueryArray, QueryObject, std::shared_ptr<QueryArray>>(m, "QueryArray");
 

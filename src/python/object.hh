@@ -9,6 +9,7 @@ public:
     virtual std::shared_ptr<QueryObject> map(
         const std::function<std::shared_ptr<QueryObject>(QueryObject *)> &mapper);
     [[nodiscard]] virtual std::map<std::string, std::string> values() const { return {}; }
+    [[nodiscard]] virtual bool is_array() const { return false; }
 };
 
 struct QueryArray : public QueryObject {
@@ -24,6 +25,8 @@ public:
 
     virtual std::vector<std::shared_ptr<QueryObject>>::iterator begin() { return data.begin(); }
     std::vector<std::shared_ptr<QueryObject>>::iterator end() { return data.end(); }
+
+    [[nodiscard]] bool is_array() const override { return true; }
 
     // default rtl_list holder
     // child class can implement their own rtl_list holders

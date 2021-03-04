@@ -194,7 +194,7 @@ void init_instance_object(py::module &m) {
              })
         .def_property_readonly(
             "definition",
-            [](const InstanceObject &obj) { return obj.instance->body.name; })
+            [](const std::shared_ptr<InstanceObject> &obj) { return obj->instance->body.name; })
         .def_property_readonly("parent",
                                [](const InstanceObject &obj) { return get_parent_instance(obj); });
 }
