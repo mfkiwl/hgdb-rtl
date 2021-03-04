@@ -22,7 +22,7 @@ public:
     // this holds instance information
     const slang::InstanceSymbol *instance;
 
-    std::map<std::string, std::string> values() const override;
+    [[nodiscard]] std::map<std::string, std::string> values() const override;
 };
 
 struct VariableObject : public RTLQueryObject {
@@ -31,7 +31,7 @@ public:
         : RTLQueryObject(db), variable(variable) {}
     const slang::ValueSymbol *variable;
 
-    std::map<std::string, std::string> values() const override;
+    [[nodiscard]] std::map<std::string, std::string> values() const override;
 };
 
 struct PortObject : public VariableObject {
@@ -40,7 +40,7 @@ public:
         : VariableObject(db, port), port(port) {}
     const slang::PortSymbol *port = nullptr;
 
-    std::map<std::string, std::string> values() const override;
+    [[nodiscard]] std::map<std::string, std::string> values() const override;
 };
 
 class RTL : public DataSource {

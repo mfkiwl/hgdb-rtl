@@ -16,6 +16,8 @@ def test_instance_select():
     o = Ooze()
     o.add_source(rtl)
     lst = o.select(Instance)
+    print(len(lst))
+    print(lst)
 
 
 if __name__ == "__main__":

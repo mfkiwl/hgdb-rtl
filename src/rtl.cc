@@ -262,53 +262,31 @@ const slang::InstanceSymbol *DesignDatabase::get_parent_instance(const slang::Sy
     return get_instance_from_scope(scope);
 }
 
-class InstanceVisitor {
+class InstanceValueVisitor : public slang::ASTVisitor<InstanceValueVisitor, false, false> {
 public:
-    explicit InstanceVisitor(
-        std::unordered_map<std::string, const slang::InstanceSymbol *> &instances,
-        std::unordered_map<const slang::InstanceSymbol *, const slang::InstanceSymbol *>
-            &hierarchy_map)
-        : instances_(instances), hierarchy_map_(hierarchy_map), hierarchy_() {}
+    InstanceValueVisitor(slang::Compilation &compilation,
+                         std::unordered_map<std::string, const slang::InstanceSymbol *> &instances,
+                         std::unordered_map<const slang::InstanceSymbol *,
+                                            const slang::InstanceSymbol *> &hierarchy_map)
+        : compilation_(compilation), instances_(instances), hierarchy_map_(hierarchy_map) {}
 
-    template <typename T>
-    void visit(const T &elem) {
-        if constexpr (std::is_base_of<slang::Symbol, T>::value) {
-            if (slang::InstanceSymbol::isKind(elem.kind)) {
-                auto const &instance = elem.template as<slang::InstanceSymbol>();
-                // setup register hierarchy as well
-                if (!hierarchy_.empty()) {
-                    auto const *parent = hierarchy_.top();
-                    hierarchy_map_.emplace(&instance, parent);
-                }
-
-                auto const &body = instance.body;
-                std::string instance_name;
-                instance.getHierarchicalPath(instance_name);
-                instances_.emplace(instance_name, &instance);
-                // push to stack
-                hierarchy_.emplace(&instance);
-
-                visit(instance.body);
-
-                // pop the stack
-                hierarchy_.pop();
-
-                return;
-            }
+    [[maybe_unused]] void handle(const slang::InstanceSymbol &instance) {
+        std::string instance_name;
+        instance.getHierarchicalPath(instance_name);
+        instances_.emplace(instance_name, &instance);
+        auto parent_instances = compilation_.getParentInstances(instance.body);
+        if (!parent_instances.empty()) {
+            auto const *parent = parent_instances.back();
+            hierarchy_map_.emplace(&instance, parent);
         }
-        if constexpr (std::is_base_of<slang::Scope, T>::value) {
-            auto const &scope = elem.template as<slang::Scope>();
-            for (auto const &mem : scope.members()) {
-                visit(mem);
-            }
-        }
+        visitDefault(instance);
     }
 
 private:
+    slang::Compilation &compilation_;
     std::unordered_map<std::string, const slang::InstanceSymbol *> &instances_;
     std::unordered_map<const slang::InstanceSymbol *, const slang::InstanceSymbol *>
         &hierarchy_map_;
-    std::stack<const slang::InstanceSymbol *> hierarchy_;
 };
 
 class VariableVisitor {
@@ -335,8 +313,10 @@ private:
 };
 
 void DesignDatabase::index_values() {
-    InstanceVisitor visitor(instances_map_, hierarchy_map_);
-    visitor.visit(compilation_.getRoot());
+    //InstanceVisitor visitor(instances_map_, hierarchy_map_);
+    //visitor.visit(compilation_.getRoot());
+    InstanceValueVisitor vv(compilation_, instances_map_, hierarchy_map_);
+    vv.visit(compilation_.getRoot());
 
     instances_.reserve(instances_map_.size());
     for (auto const &[inst_name, inst] : instances_map_) {

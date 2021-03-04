@@ -46,7 +46,7 @@ std::shared_ptr<QueryArray> create_port_array(hgdb::rtl::DesignDatabase &db) {
 std::map<std::string, std::string> InstanceObject::values() const {
     std::string path;
     instance->getHierarchicalPath(path);
-    auto def_name = std::string(instance->getDefinition().name);
+    auto def_name = std::string(instance->body.name);
     return {{"name", std::string(instance->name)},
             {"path", path},
             {"definition", def_name}};
