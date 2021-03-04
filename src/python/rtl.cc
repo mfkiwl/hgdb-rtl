@@ -13,39 +13,55 @@
 
 namespace py = pybind11;
 
-InstanceSelector::InstanceSelector(hgdb::rtl::DesignDatabase &db) {
+std::shared_ptr<QueryArray> create_instance_array(hgdb::rtl::DesignDatabase &db) {
+    auto result = std::make_shared<QueryArray>();
     auto const &instances = db.instances();
-    data_.reserve(instances.size());
+    result->data.reserve(instances.size());
     for (auto const *inst : instances) {
-        data_.emplace_back(std::make_shared<InstanceObject>(&db, inst));
+        result->data.emplace_back(std::make_shared<InstanceObject>(&db, inst));
     }
+    return result;
 }
 
-VariableSelector::VariableSelector(hgdb::rtl::DesignDatabase &db) {
+std::shared_ptr<QueryArray> create_variable_array(hgdb::rtl::DesignDatabase &db) {
+    auto result = std::make_shared<QueryArray>();
     auto const &variables = db.variables();
-    data_.reserve(variables.size());
+    result->data.reserve(variables.size());
     for (auto const *v : variables) {
-        data_.emplace_back(std::make_shared<VariableObject>(&db, v));
+        result->data.emplace_back(std::make_shared<VariableObject>(&db, v));
     }
+    return result;
 }
 
-PortSelector::PortSelector(hgdb::rtl::DesignDatabase &db) {
+std::shared_ptr<QueryArray> create_port_array(hgdb::rtl::DesignDatabase &db) {
+    auto result = std::make_shared<QueryArray>();
     auto const &ports = db.ports();
-    data_.reserve(ports.size());
+    result->data.reserve(ports.size());
     for (auto const *p : ports) {
-        data_.emplace_back(std::make_shared<PortObject>(&db, p));
+        result->data.emplace_back(std::make_shared<PortObject>(&db, p));
     }
+    return result;
 }
 
-void RTLQueryArray::add(const std::shared_ptr<QueryObject> &obj) {
-    // test if it is an rtl object
-    auto *p = obj.get();
-    auto *casted = dynamic_cast<RTLQueryObject *>(p);
-    if (!casted) {
-        throw py::type_error();
-    }
-    auto new_obj = std::reinterpret_pointer_cast<RTLQueryObject>(obj);
-    rtl_list.emplace_back(new_obj);
+std::map<std::string, std::string> InstanceObject::values() const {
+    std::string path;
+    instance->getHierarchicalPath(path);
+    auto def_name = std::string(instance->getDefinition().name);
+    return {{"name", std::string(instance->name)},
+            {"path", path},
+            {"definition", def_name}};
+}
+
+std::map<std::string, std::string> VariableObject::values() const {
+    std::string path;
+    variable->getHierarchicalPath(path);
+    return {{"name", std::string(variable->name)}, {"path", path}};
+}
+
+std::map<std::string, std::string> PortObject::values() const {
+    std::string path;
+    port->getHierarchicalPath(path);
+    return {{"name", std::string(port->name)}, {"path", path}};
 }
 
 std::unique_ptr<slang::Compilation> RTL::compile() const {
@@ -122,11 +138,11 @@ std::shared_ptr<QueryArray> RTL::get_selector(py::handle handle) {
     // based on what type it is
     if (handle.is(py::type::of<InstanceObject>())) {
         // create instance selector
-        return std::make_shared<InstanceSelector>(*db_);
+        return create_instance_array(*db_);
     } else if (handle.is(py::type::of<VariableObject>())) {
-        return std::make_shared<VariableSelector>(*db_);
+        return create_variable_array(*db_);
     } else if (handle.is(py::type::of<PortObject>())) {
-        return std::make_shared<PortSelector>(*db_);
+        return create_port_array(*db_);
     }
     return nullptr;
 }
@@ -216,24 +232,9 @@ void init_port_object(py::module &m) {
     });
 }
 
-void init_query_array(py::module &m) {
-    auto cls =
-        py::class_<RTLQueryArray, RTLQueryObject, QueryArray, std::shared_ptr<RTLQueryArray>>(
-            m, "RTLQueryArray");
-}
-
 void init_rtl_object(py::module &m) {
     auto cls = py::class_<RTLQueryObject, QueryObject, std::shared_ptr<RTLQueryObject>>(
         m, "RTLQueryObject");
-}
-
-void init_selector(py::module &m) {
-    auto inst = py::class_<InstanceSelector, QueryArray, std::shared_ptr<InstanceSelector>>(
-        m, "InstanceSelector");
-    auto vars = py::class_<VariableSelector, QueryArray, std::shared_ptr<VariableSelector>>(
-        m, "VariableSelector");
-    auto ports =
-        py::class_<PortSelector, QueryArray, std::shared_ptr<PortSelector>>(m, "PortSelector");
 }
 
 void init_rtl(py::module &m) {
@@ -249,6 +250,4 @@ void init_rtl(py::module &m) {
     init_instance_object(m);
     init_variable_object(m);
     init_port_object(m);
-    init_selector(m);
-    init_query_array(m);
 }

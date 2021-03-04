@@ -4,6 +4,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <sstream>
+
 #include "rtl.hh"
 
 namespace py = pybind11;
@@ -27,18 +29,21 @@ std::shared_ptr<QueryObject> QueryArray::map(
     return std::move(result);
 }
 
-std::vector<QueryObject *> QueryArray::list() {
-    std::vector<QueryObject *> result;
-    result.reserve(list_.size());
-    for (auto const &obj : list_) result.emplace_back(obj.get());
-    return result;
-}
-
-void QueryArray::add(const std::shared_ptr<QueryObject> &obj) { list_.emplace_back(obj); }
+void QueryArray::add(const std::shared_ptr<QueryObject> &obj) { data.emplace_back(obj); }
 
 void init_object(py::module &m) {
     auto obj = py::class_<QueryObject, std::shared_ptr<QueryObject>>(m, "QueryObject");
     obj.def("map", &QueryObject::map);
+    obj.def("__repr__", [](const QueryObject &obj) {
+        // pretty print the values
+        // we will just use json to print out stuff
+        py::dict dict;
+        auto const values = obj.values();
+        for (auto const &[name, value] : values) {
+            dict[name.c_str()] = value;
+        }
+        return py::str(dict);
+    });
 
     auto array = py::class_<QueryArray, QueryObject, std::shared_ptr<QueryArray>>(m, "QueryArray");
 
@@ -52,5 +57,14 @@ void init_object(py::module &m) {
                 }
                 return array.get(index);
             },
-            py::return_value_policy::reference);
+            py::return_value_policy::reference)
+        .def("__iter__", [](QueryArray &array) { return py::make_iterator(array.data); });
+    array.def("__repr__", [](const QueryArray &array) {
+        py::list list;
+        for (auto const &value : array.data) {
+            auto obj = py::cast(value);
+            list.append(obj);
+        }
+        return py::str(list);
+    });
 }

@@ -15,26 +15,14 @@ public:
     hgdb::rtl::DesignDatabase *db;
 };
 
-struct RTLQueryArray : QueryArray, RTLQueryObject {
-public:
-    template <typename T>
-    RTLQueryArray(hgdb::rtl::DesignDatabase *db, const T &begin, const T &end)
-        : RTLQueryObject(db), rtl_list(begin, end) {}
-    hgdb::rtl::DesignDatabase *db = nullptr;
-    std::vector<std::shared_ptr<RTLQueryObject>> rtl_list;
-    [[nodiscard]] uint64_t size() const override { return rtl_list.size(); }
-    [[nodiscard]] std::shared_ptr<QueryObject> get(uint64_t idx) const override {
-        return rtl_list[idx];
-    }
-    void add(const std::shared_ptr<QueryObject> &obj) override;
-};
-
 struct InstanceObject : public RTLQueryObject {
 public:
     InstanceObject(hgdb::rtl::DesignDatabase *db, const slang::InstanceSymbol *instance)
         : RTLQueryObject(db), instance(instance) {}
     // this holds instance information
     const slang::InstanceSymbol *instance;
+
+    std::map<std::string, std::string> values() const override;
 };
 
 struct VariableObject : public RTLQueryObject {
@@ -42,6 +30,8 @@ public:
     VariableObject(hgdb::rtl::DesignDatabase *db, const slang::ValueSymbol *variable)
         : RTLQueryObject(db), variable(variable) {}
     const slang::ValueSymbol *variable;
+
+    std::map<std::string, std::string> values() const override;
 };
 
 struct PortObject : public VariableObject {
@@ -49,41 +39,8 @@ public:
     PortObject(hgdb::rtl::DesignDatabase *db, const slang::PortSymbol *port)
         : VariableObject(db, port), port(port) {}
     const slang::PortSymbol *port = nullptr;
-};
 
-// Curiously Recurring Template Pattern (CRTP)
-template <typename T>
-class RTLSelector : public QueryArray {
-    [[nodiscard]] uint64_t size() const override { return data_.size(); }
-    [[nodiscard]] std::shared_ptr<QueryObject> get(uint64_t idx) const override {
-        return data_[idx];
-    }
-    void add(const std::shared_ptr<QueryObject> &obj) override {
-        auto *ptr = dynamic_cast<T *>(obj.get());
-        if (!ptr) {
-            throw py::type_error();
-        }
-        auto o = std::reinterpret_pointer_cast<T>(obj);
-        data_.emplace_back(o);
-    }
-
-protected:
-    std::vector<std::shared_ptr<T>> data_;
-};
-
-class InstanceSelector : public RTLSelector<InstanceObject> {
-public:
-    explicit InstanceSelector(hgdb::rtl::DesignDatabase &db);
-};
-
-class VariableSelector : public RTLSelector<VariableObject> {
-public:
-    explicit VariableSelector(hgdb::rtl::DesignDatabase &db);
-};
-
-class PortSelector : public RTLSelector<PortObject> {
-public:
-    explicit PortSelector(hgdb::rtl::DesignDatabase &db);
+    std::map<std::string, std::string> values() const override;
 };
 
 class RTL : public DataSource {
