@@ -54,18 +54,3 @@ void init_object(py::module &m) {
             },
             py::return_value_policy::reference);
 }
-
-// type caster for objects
-namespace pybind11 {
-template <>
-struct [[maybe_unused]] polymorphic_type_hook<QueryObject> {
-    static const void *get(const QueryObject *src, const std::type_info *&type) {
-        if (src) {
-            auto const &info = src->type_info();
-            type = &info;
-            return src;
-        }
-        return src;
-    }
-};
-}  // namespace pybind11

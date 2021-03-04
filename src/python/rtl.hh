@@ -13,10 +13,6 @@ struct RTLQueryObject : public QueryObject {
 public:
     explicit RTLQueryObject(hgdb::rtl::DesignDatabase *db) : db(db) {}
     hgdb::rtl::DesignDatabase *db;
-
-    [[nodiscard]] inline const std::type_info &type_info() const override {
-        return ::get_type_info<RTLQueryObject>();
-    }
 };
 
 struct RTLQueryArray : QueryArray, RTLQueryObject {
@@ -31,10 +27,6 @@ public:
         return rtl_list[idx];
     }
     void add(const std::shared_ptr<QueryObject> &obj) override;
-
-    [[nodiscard]] inline const std::type_info &type_info() const override {
-        return ::get_type_info<RTLQueryArray>();
-    }
 };
 
 struct InstanceObject : public RTLQueryObject {
@@ -43,10 +35,6 @@ public:
         : RTLQueryObject(db), instance(instance) {}
     // this holds instance information
     const slang::InstanceSymbol *instance;
-
-    [[nodiscard]] inline const std::type_info &type_info() const override {
-        return ::get_type_info<InstanceObject>();
-    }
 };
 
 struct VariableObject : public RTLQueryObject {
@@ -54,10 +42,6 @@ public:
     VariableObject(hgdb::rtl::DesignDatabase *db, const slang::ValueSymbol *variable)
         : RTLQueryObject(db), variable(variable) {}
     const slang::ValueSymbol *variable;
-
-    [[nodiscard]] inline const std::type_info &type_info() const override {
-        return ::get_type_info<VariableObject>();
-    }
 };
 
 struct PortObject : public VariableObject {
@@ -65,14 +49,10 @@ public:
     PortObject(hgdb::rtl::DesignDatabase *db, const slang::PortSymbol *port)
         : VariableObject(db, port), port(port) {}
     const slang::PortSymbol *port = nullptr;
-
-    [[nodiscard]] inline const std::type_info &type_info() const override {
-        return ::get_type_info<PortObject>();
-    }
 };
 
 // Curiously Recurring Template Pattern (CRTP)
-template <typename T, typename K>
+template <typename T>
 class RTLSelector : public QueryArray {
     [[nodiscard]] uint64_t size() const override { return data_.size(); }
     [[nodiscard]] std::shared_ptr<QueryObject> get(uint64_t idx) const override {
@@ -87,25 +67,21 @@ class RTLSelector : public QueryArray {
         data_.emplace_back(o);
     }
 
-    [[nodiscard]] inline const std::type_info &type_info() const override {
-        return ::get_type_info<K>();
-    }
-
 protected:
     std::vector<std::shared_ptr<T>> data_;
 };
 
-class InstanceSelector : public RTLSelector<InstanceObject, InstanceSelector> {
+class InstanceSelector : public RTLSelector<InstanceObject> {
 public:
     explicit InstanceSelector(hgdb::rtl::DesignDatabase &db);
 };
 
-class VariableSelector : public RTLSelector<VariableObject, VariableSelector> {
+class VariableSelector : public RTLSelector<VariableObject> {
 public:
     explicit VariableSelector(hgdb::rtl::DesignDatabase &db);
 };
 
-class PortSelector : public RTLSelector<PortObject, PortSelector> {
+class PortSelector : public RTLSelector<PortObject> {
 public:
     explicit PortSelector(hgdb::rtl::DesignDatabase &db);
 };
