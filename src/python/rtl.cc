@@ -46,10 +46,9 @@ std::shared_ptr<QueryArray> create_port_array(hgdb::rtl::DesignDatabase &db) {
 std::map<std::string, std::string> InstanceObject::values() const {
     std::string path;
     instance->getHierarchicalPath(path);
-    auto def_name = std::string(instance->body.name);
     return {{"name", std::string(instance->name)},
             {"path", path},
-            {"definition", def_name}};
+            {"definition", std::string(instance->body.name)}};
 }
 
 std::map<std::string, std::string> VariableObject::values() const {
@@ -64,12 +63,12 @@ std::map<std::string, std::string> PortObject::values() const {
     return {{"name", std::string(port->name)}, {"path", path}};
 }
 
-std::unique_ptr<slang::Compilation> RTL::compile() const {
+void RTL::compile() {
     bool has_error = false;
-    slang::SourceManager source_manager;
+    source_manager_ = std::make_unique<slang::SourceManager>();
     for (const std::string &dir : include_dirs) {
         try {
-            source_manager.addUserDirectory(string_view(dir));
+            source_manager_->addUserDirectory(string_view(dir));
         } catch (const std::exception &) {
             throw std::runtime_error(fmt::format("include directory {0} does not exist", dir));
         }
@@ -77,7 +76,7 @@ std::unique_ptr<slang::Compilation> RTL::compile() const {
 
     for (const std::string &dir : include_sys_dirs_) {
         try {
-            source_manager.addSystemDirectory(string_view(dir));
+            source_manager_->addSystemDirectory(string_view(dir));
         } catch (const std::exception &) {
             throw std::runtime_error(fmt::format("include directory {0} does not exist", dir));
         }
@@ -109,7 +108,7 @@ std::unique_ptr<slang::Compilation> RTL::compile() const {
 
     std::vector<slang::SourceBuffer> buffers;
     for (const std::string &file : files_) {
-        slang::SourceBuffer buffer = source_manager.readSource(file);
+        slang::SourceBuffer buffer = source_manager_->readSource(file);
         if (!buffer) {
             has_error = true;
             continue;
@@ -118,12 +117,12 @@ std::unique_ptr<slang::Compilation> RTL::compile() const {
         buffers.push_back(buffer);
     }
 
-    auto compilation = std::make_unique<slang::Compilation>(options);
+    compilation_ = std::make_unique<slang::Compilation>(options);
     for (const slang::SourceBuffer &buffer : buffers)
-        compilation->addSyntaxTree(slang::SyntaxTree::fromBuffer(buffer, source_manager, options));
-    slang::DiagnosticEngine diag_engine(source_manager);
+        compilation_->addSyntaxTree(slang::SyntaxTree::fromBuffer(buffer, *source_manager_, options));
+    slang::DiagnosticEngine diag_engine(*source_manager_);
     // issuing all diagnosis
-    for (auto const &diag : compilation->getAllDiagnostics()) diag_engine.issue(diag);
+    for (auto const &diag : compilation_->getAllDiagnostics()) diag_engine.issue(diag);
     if (!has_error) {
         has_error = diag_engine.getNumErrors() != 0;
     }
@@ -131,8 +130,6 @@ std::unique_ptr<slang::Compilation> RTL::compile() const {
     if (has_error) {
         std::cerr << "Error when parsing RTL files. Design database is incomplete" << std::endl;
     }
-
-    return std::move(compilation);
 }
 
 std::shared_ptr<QueryArray> RTL::get_selector(py::handle handle) {
@@ -149,7 +146,7 @@ std::shared_ptr<QueryArray> RTL::get_selector(py::handle handle) {
 }
 
 void RTL::on_added(Ooze *) {
-    compilation_ = compile();
+    compile();
     db_ = std::make_unique<hgdb::rtl::DesignDatabase>(*compilation_);
 }
 
@@ -173,7 +170,7 @@ void init_instance_object(py::module &m) {
         py::class_<InstanceObject, RTLQueryObject, std::shared_ptr<InstanceObject>>(m, "Instance");
     // we don't allow users to construct it by themself
     cls.def_property_readonly(
-           "name", [](const InstanceObject &obj) { return std::string(obj.instance->name); })
+           "name", [](const InstanceObject &obj) { return obj.instance->name; })
         .def_property_readonly("path",
                                [](const InstanceObject &obj) {
                                    std::string name;
@@ -197,7 +194,7 @@ void init_instance_object(py::module &m) {
              })
         .def_property_readonly(
             "definition",
-            [](const InstanceObject &obj) { return obj.instance->getDefinition().name; })
+            [](const InstanceObject &obj) { return obj.instance->body.name; })
         .def_property_readonly("parent",
                                [](const InstanceObject &obj) { return get_parent_instance(obj); });
 }

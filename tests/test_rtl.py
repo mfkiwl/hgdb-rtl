@@ -16,8 +16,9 @@ def test_instance_select():
     o = Ooze()
     o.add_source(rtl)
     lst = o.select(Instance)
-    print(len(lst))
-    print(lst)
+    assert len(lst) == 11
+    python_list = list(lst)
+    assert str(lst) == str(python_list)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <set>
-#include <stack>
 
 #include "fmt/format.h"
 #include "slang/binding/OperatorExpressions.h"

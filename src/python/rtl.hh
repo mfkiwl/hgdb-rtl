@@ -57,7 +57,7 @@ public:
     }
     inline void set_top(const std::string &top) { top_ = top; }
 
-    [[nodiscard]] std::unique_ptr<slang::Compilation> compile() const;
+    void compile();
 
     [[nodiscard]] inline std::vector<py::handle> provides() const override {
         return {py::type::of<InstanceObject>(), py::type::of<VariableObject>(),
@@ -78,6 +78,7 @@ private:
     // the compilation object
     std::unique_ptr<slang::Compilation> compilation_;
     std::unique_ptr<hgdb::rtl::DesignDatabase> db_;
+    std::unique_ptr<slang::SourceManager> source_manager_;
 };
 
 #endif  // HGDB_RTL_PYTHON_RTL_HH

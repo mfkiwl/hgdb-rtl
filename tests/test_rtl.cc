@@ -1,9 +1,12 @@
 #include <memory>
 
-#include "../extern/slang/include/slang/syntax/SyntaxTree.h"
+#include "slang/syntax/SyntaxTree.h"
+#include "slang/symbols/InstanceSymbols.h"
+#include "slang/compilation/Definition.h"
 #include "../src/rtl.hh"
 #include "gtest/gtest.h"
 #include "fmt/format.h"
+#include <unordered_set>
 
 class TestDesignDatabase : public ::testing::Test {
 protected:
@@ -257,4 +260,10 @@ endmodule
 )");
     auto const &instances = design_->instances();
     EXPECT_EQ(instances.size(), 11);
+    std::unordered_set<std::string> names;
+    for (auto const *inst: instances) {
+        auto s = std::string(inst->body.getDefinition().name);
+        names.emplace(s);
+    }
+    EXPECT_EQ(names.size(), 4);
 }
