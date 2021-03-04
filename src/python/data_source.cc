@@ -5,12 +5,12 @@ void Ooze::add_source(const std::shared_ptr<DataSource> &source) {
     sources.emplace_back(source);
     // register selected type
     auto const types = source->provides();
-    auto func = [=](py::handle handle) -> std::shared_ptr<Selector> {
+    auto func = [=](py::handle handle) -> std::shared_ptr<QueryArray> {
         return source->get_selector(handle);
     };
     for (auto const &t : types) {
         // need to register selector object
-        selector_providers.emplace(t, func);
+        selector_providers.emplace_back(SelectorProvider{t, func});
     }
     source->on_added(this);
 }
@@ -20,21 +20,22 @@ void init_data_source(py::module &m) {
         .def_property_readonly("type", [](const DataSource &source) { return source.type; });
 
     py::class_<Ooze>(m, "Ooze")
-        .def("add_source", &Ooze::add_source)
-        .def("select", [](Ooze *ooze, const py::args &types) {
-            auto query_array = std::make_unique<SelectorQueryArray>();
+        .def(py::init<>())
+        .def("add_source", &Ooze::add_source, py::arg("data_source"))
+        .def("select", [](Ooze *ooze, const py::args &types) -> std::shared_ptr<QueryObject> {
+            auto query_array = std::make_shared<QueryArray>();
             // need to find registered types
             for (auto const &t : types) {
-                if (ooze->selector_providers.find(t) == ooze->selector_providers.end()) {
-                    throw py::type_error();
-                }
-                auto const &select_func = ooze->selector_providers.at(t);
-                auto selector = select_func(t);
-                if (selector) {
-                    // need to add it to the selector
-                    query_array->selectors_.emplace_back(selector);
+                for (auto const &provider : ooze->selector_providers) {
+                    if (provider.handle.is(t)) {
+                        auto selector = provider.func(t);
+                        if (selector) {
+                            // need to add it to the selector
+                            query_array->add(selector);
+                        }
+                    }
                 }
             }
-            return std::move(query_array);
+            return query_array->size() == 1 ? query_array->get(0) : query_array;
         });
 }

@@ -15,25 +15,25 @@ namespace py = pybind11;
 
 InstanceSelector::InstanceSelector(hgdb::rtl::DesignDatabase &db) {
     auto const &instances = db.instances();
-    instances_.reserve(instances.size());
+    data_.reserve(instances.size());
     for (auto const *inst : instances) {
-        instances_.emplace_back(std::make_shared<InstanceObject>(&db, inst));
+        data_.emplace_back(std::make_shared<InstanceObject>(&db, inst));
     }
 }
 
 VariableSelector::VariableSelector(hgdb::rtl::DesignDatabase &db) {
     auto const &variables = db.variables();
-    variables_.reserve(variables.size());
+    data_.reserve(variables.size());
     for (auto const *v : variables) {
-        variables_.emplace_back(std::make_shared<VariableObject>(&db, v));
+        data_.emplace_back(std::make_shared<VariableObject>(&db, v));
     }
 }
 
 PortSelector::PortSelector(hgdb::rtl::DesignDatabase &db) {
     auto const &ports = db.ports();
-    ports_.reserve(ports.size());
+    data_.reserve(ports.size());
     for (auto const *p : ports) {
-        ports_.emplace_back(std::make_shared<PortObject>(&db, p));
+        data_.emplace_back(std::make_shared<PortObject>(&db, p));
     }
 }
 
@@ -118,7 +118,7 @@ std::unique_ptr<slang::Compilation> RTL::compile() const {
     return std::move(compilation);
 }
 
-std::shared_ptr<Selector> RTL::get_selector(py::handle handle) {
+std::shared_ptr<QueryArray> RTL::get_selector(py::handle handle) {
     // based on what type it is
     if (handle.is(py::type::of<InstanceObject>())) {
         // create instance selector
@@ -227,6 +227,15 @@ void init_rtl_object(py::module &m) {
         m, "RTLQueryObject");
 }
 
+void init_selector(py::module &m) {
+    auto inst = py::class_<InstanceSelector, QueryArray, std::shared_ptr<InstanceSelector>>(
+        m, "InstanceSelector");
+    auto vars = py::class_<VariableSelector, QueryArray, std::shared_ptr<VariableSelector>>(
+        m, "VariableSelector");
+    auto ports =
+        py::class_<PortSelector, QueryArray, std::shared_ptr<PortSelector>>(m, "PortSelector");
+}
+
 void init_rtl(py::module &m) {
     py::class_<RTL, DataSource, std::shared_ptr<RTL>>(m, "RTL")
         .def(py::init<>())
@@ -240,5 +249,6 @@ void init_rtl(py::module &m) {
     init_instance_object(m);
     init_variable_object(m);
     init_port_object(m);
+    init_selector(m);
     init_query_array(m);
 }

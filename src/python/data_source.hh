@@ -6,7 +6,6 @@
 #include <pybind11/stl.h>
 
 #include "object.hh"
-#include "query.hh"
 #include "slang/compilation/Compilation.h"
 #include "slang/parsing/Preprocessor.h"
 #include "slang/symbols/CompilationUnitSymbols.h"
@@ -27,7 +26,7 @@ public:
     DataSourceType type;
 
     [[nodiscard]] virtual std::vector<py::handle> provides() const = 0;
-    [[nodiscard]] virtual std::shared_ptr<Selector> get_selector(py::handle handle) = 0;
+    [[nodiscard]] virtual std::shared_ptr<QueryArray> get_selector(py::handle handle) = 0;
 
     virtual void on_added(Ooze *) {}
 };
@@ -38,7 +37,11 @@ public:
     void add_source(const std::shared_ptr<DataSource> &source);
 
     std::vector<std::shared_ptr<DataSource>> sources;
-    std::map<py::handle, std::function<std::shared_ptr<Selector>(py::handle)>> selector_providers;
+    struct SelectorProvider {
+        py::handle handle;
+        std::function<std::shared_ptr<QueryArray>(py::handle)> func;
+    };
+    std::vector<SelectorProvider> selector_providers;
 };
 
 void init_data_source(py::module &m);
