@@ -315,8 +315,8 @@ private:
 void DesignDatabase::index_values() {
     //InstanceVisitor visitor(instances_map_, hierarchy_map_);
     //visitor.visit(compilation_.getRoot());
-    InstanceValueVisitor vv(compilation_, instances_map_, hierarchy_map_);
-    vv.visit(compilation_.getRoot());
+    InstanceValueVisitor visitor(compilation_, instances_map_, hierarchy_map_);
+    visitor.visit(compilation_.getRoot());
 
     instances_.reserve(instances_map_.size());
     for (auto const &[inst_name, inst] : instances_map_) {

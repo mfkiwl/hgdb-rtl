@@ -8,12 +8,18 @@
 class TestDesignDatabase : public ::testing::Test {
 protected:
     void load_str(const std::string_view &sv) {
+        slang::CompilationOptions compile_options;
+        compile_options.disableInstanceCaching = true;
+        slang::Bag bag;
+        bag.set(compile_options);
+        compilation = std::make_unique<slang::Compilation>(bag);
         auto tree = slang::SyntaxTree::fromText(sv);
-        compilation.addSyntaxTree(tree);
-        design_ = std::make_unique<hgdb::rtl::DesignDatabase>(compilation);
+
+        compilation->addSyntaxTree(tree);
+        design_ = std::make_unique<hgdb::rtl::DesignDatabase>(*compilation);
     }
 
-    slang::Compilation compilation;
+    std::unique_ptr<slang::Compilation> compilation;
     std::unique_ptr<hgdb::rtl::DesignDatabase> design_;
 };
 
@@ -208,7 +214,7 @@ endmodule
     EXPECT_EQ(inst, top);
 }
 
-TEST_F(TestDesignDatabase, get_values) {    // NOLINT
+TEST_F(TestDesignDatabase, get_values_simple) {    // NOLINT
     load_str(R"(
 module mod (
   input logic a,
@@ -228,4 +234,27 @@ endmodule
     EXPECT_EQ(instances.size(), 2);
     EXPECT_EQ(variables.size(), 5);
     EXPECT_EQ(ports.size(), 2);
+}
+
+TEST_F(TestDesignDatabase, get_instances_complex) { // NOLINT
+    load_str(R"(
+module mod1;
+endmodule
+
+module mod2;
+mod1 inst2();
+endmodule
+
+module mod3;
+mod2 inst3();
+mod2 inst4();
+endmodule
+
+module top;
+mod3 inst5();
+mod3 inst6();
+endmodule
+)");
+    auto const &instances = design_->instances();
+    EXPECT_EQ(instances.size(), 11);
 }
