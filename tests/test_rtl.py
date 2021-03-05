@@ -1,5 +1,5 @@
 import os
-from ooze import Instance, Ooze, RTL, Variable
+from ooze import Instance, Ooze, RTL, Variable, inside
 
 
 def setup_source(filename):
@@ -55,5 +55,13 @@ def test_type_select():
     assert len(result) == 7
 
 
+def test_inside_op():
+    o = setup_source("test_inside_op.sv")
+    top = o.select(Instance).where(definition="top")
+    inst = o.select(Instance).where(path="top.inst.inst")
+    res = o.select(Instance).where(inside(top))
+    print(res)
+
+
 if __name__ == "__main__":
-    test_type_select()
+    test_inside_op()

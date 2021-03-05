@@ -119,7 +119,8 @@ void RTL::compile() {
 
     compilation_ = std::make_unique<slang::Compilation>(options);
     for (const slang::SourceBuffer &buffer : buffers)
-        compilation_->addSyntaxTree(slang::SyntaxTree::fromBuffer(buffer, *source_manager_, options));
+        compilation_->addSyntaxTree(
+            slang::SyntaxTree::fromBuffer(buffer, *source_manager_, options));
     slang::DiagnosticEngine diag_engine(*source_manager_);
     // issuing all diagnosis
     for (auto const &diag : compilation_->getAllDiagnostics()) diag_engine.issue(diag);
@@ -169,8 +170,7 @@ void init_instance_object(py::module &m) {
     auto cls =
         py::class_<InstanceObject, RTLQueryObject, std::shared_ptr<InstanceObject>>(m, "Instance");
     // we don't allow users to construct it by themself
-    cls.def_property_readonly(
-           "name", [](const InstanceObject &obj) { return obj.instance->name; })
+    cls.def_property_readonly("name", [](const InstanceObject &obj) { return obj.instance->name; })
         .def_property_readonly("path",
                                [](const InstanceObject &obj) {
                                    std::string name;
@@ -235,6 +235,33 @@ void init_rtl_object(py::module &m) {
         m, "RTLQueryObject");
 }
 
+void init_helper_functions(py::module &m) {
+    m.def("inside", [](const std::shared_ptr<RTLQueryObject> &parent) {
+        auto func = [=](const std::shared_ptr<RTLQueryObject> &obj) {
+            if (!InstanceObject::is_kind(parent->kind)) {
+                // vars doesn't have scope for now (interface however, can). maybe need to revisit
+                // this later
+                return false;
+            }
+            auto const &instance = std::reinterpret_pointer_cast<InstanceObject>(parent);
+            switch (obj->kind) {
+                case RTLQueryObject::RTLKind::Instance: {
+                    auto const &child = std::reinterpret_pointer_cast<InstanceObject>(obj);
+                    return hgdb::rtl::DesignDatabase::symbol_inside(child->instance,
+                                                                    instance->instance);
+                }
+                case RTLQueryObject::RTLKind::Variable:
+                case RTLQueryObject::RTLKind::Port: {
+                    auto const &child = std::reinterpret_pointer_cast<VariableObject>(obj);
+                    return hgdb::rtl::DesignDatabase::symbol_inside(child->variable,
+                                                                    instance->instance);
+                }
+            }
+        };
+        return func;
+    });
+}
+
 void init_rtl(py::module &m) {
     py::class_<RTL, DataSource, std::shared_ptr<RTL>>(m, "RTL")
         .def(py::init<>())
@@ -248,4 +275,6 @@ void init_rtl(py::module &m) {
     init_instance_object(m);
     init_variable_object(m);
     init_port_object(m);
+
+    init_helper_functions(m);
 }

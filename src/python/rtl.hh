@@ -11,40 +11,51 @@
 
 struct RTLQueryObject : public QueryObject {
 public:
+    enum class RTLKind { Instance, Variable, Port };
     RTLQueryObject() = delete;
-    explicit RTLQueryObject(hgdb::rtl::DesignDatabase *db) : db(db) {}
+    explicit RTLQueryObject(hgdb::rtl::DesignDatabase *db, RTLKind kind) : db(db), kind(kind) {}
     hgdb::rtl::DesignDatabase *db;
+
+    RTLKind kind;
 };
 
 struct InstanceObject : public RTLQueryObject {
 public:
     InstanceObject() = delete;
     InstanceObject(hgdb::rtl::DesignDatabase *db, const slang::InstanceSymbol *instance)
-        : RTLQueryObject(db), instance(instance) {}
+        : RTLQueryObject(db, RTLKind::Instance), instance(instance) {}
     // this holds instance information
     const slang::InstanceSymbol *instance = nullptr;
 
     [[nodiscard]] std::map<std::string, std::string> values() const override;
+
+    [[nodiscard]] static bool is_kind(RTLKind kind) { return kind == RTLKind::Instance; }
 };
 
 struct VariableObject : public RTLQueryObject {
 public:
     VariableObject() = delete;
     VariableObject(hgdb::rtl::DesignDatabase *db, const slang::ValueSymbol *variable)
-        : RTLQueryObject(db), variable(variable) {}
+        : RTLQueryObject(db, RTLKind::Variable), variable(variable) {}
     const slang::ValueSymbol *variable = nullptr;
 
     [[nodiscard]] std::map<std::string, std::string> values() const override;
+
+    static bool is_kind(RTLKind kind) { return kind == RTLKind::Port || kind == RTLKind::Variable; }
 };
 
 struct PortObject : public VariableObject {
 public:
     PortObject() = delete;
     PortObject(hgdb::rtl::DesignDatabase *db, const slang::PortSymbol *port)
-        : VariableObject(db, port), port(port) {}
+        : VariableObject(db, port), port(port) {
+        kind = RTLKind::Port;
+    }
     const slang::PortSymbol *port = nullptr;
 
     [[nodiscard]] std::map<std::string, std::string> values() const override;
+
+    static bool is_kind(RTLKind kind) { return kind == RTLKind::Port; }
 };
 
 class RTL : public DataSource {

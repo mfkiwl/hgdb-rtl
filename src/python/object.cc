@@ -7,7 +7,6 @@
 #include <sstream>
 
 #include "query.hh"
-#include "rtl.hh"
 
 namespace py = pybind11;
 
@@ -40,6 +39,24 @@ std::shared_ptr<QueryObject> filter_query_object(
     return r;
 }
 
+std::shared_ptr<QueryObject> filter_query_object_kwargs(const std::shared_ptr<QueryObject> &obj,
+                                                        const py::kwargs &kwargs) {
+    // need to construct the function
+    auto func = [&](const std::shared_ptr<QueryObject> &target) -> bool {
+        auto py_obj = py::cast(target);
+        for (auto const &[name, value] : kwargs) {  // NOLINT
+            if (!py::hasattr(py_obj, name)) return false;
+            auto const &v = py_obj.attr(name);
+            if (!value.equal(v)) return false;
+        }
+        return true;
+    };
+
+    auto filter = Filter(func);
+    auto r = filter.apply(obj);
+    return r;
+}
+
 std::shared_ptr<QueryObject> select_type(const std::shared_ptr<QueryObject> &obj,
                                          const py::object &type) {
     // if it's not an array it's easy
@@ -61,7 +78,7 @@ std::shared_ptr<QueryObject> select_type(const std::shared_ptr<QueryObject> &obj
             auto r = select_type(entry, type);
             if (r->is_array()) {
                 auto const &r_array = std::reinterpret_pointer_cast<QueryArray>(r);
-                if (r_array->size() > 0) {
+                if (!r_array->empty()) {
                     result->add(r);
                 }
             } else {
@@ -80,7 +97,32 @@ std::shared_ptr<QueryObject> select_type(const std::shared_ptr<QueryObject> &obj
     return result;
 }
 
-void init_object(py::module &m) {
+std::shared_ptr<QueryObject> map_object(
+    const std::shared_ptr<QueryObject> &obj,
+    const std::function<std::shared_ptr<QueryObject>(const std::shared_ptr<QueryObject> &)> &func) {
+    if (obj->is_array()) {
+        auto const &array = std::reinterpret_pointer_cast<QueryArray>(obj);
+        auto result = std::make_shared<QueryArray>();
+        for (auto const &entry : array->data) {
+            auto o = map_object(entry, func);
+            if (o) {
+                result->add(o);
+            }
+        }
+        if (result->empty()) {
+            return nullptr;
+        } else if (result->size() == 1) {
+            return result->get(0);
+        } else {
+            return result;
+        }
+    } else {
+        auto o = func(obj);
+        return o;
+    }
+}
+
+void init_query_object(py::module &m) {
     auto obj = py::class_<QueryObject, std::shared_ptr<QueryObject>>(m, "QueryObject");
     obj.def("map", &QueryObject::map);
     obj.def("__repr__", [](const QueryObject &obj) {
@@ -102,6 +144,7 @@ void init_object(py::module &m) {
             return filter_query_object(obj, func);
         },
         py::arg("predicate"));
+    obj.def("filter", &filter_query_object_kwargs);
     // notice that where is the same as filter
     obj.def(
         "where",
@@ -110,6 +153,7 @@ void init_object(py::module &m) {
             return filter_query_object(obj, func);
         },
         py::arg("predicate"));
+    obj.def("where", &filter_query_object_kwargs);
     obj.def(
         "select",
         [](const std::shared_ptr<QueryObject> &obj, const std::string &attr) -> py::object {
@@ -139,7 +183,14 @@ void init_object(py::module &m) {
         [](const std::shared_ptr<QueryObject> &obj, const py::object &type)
             -> std::shared_ptr<QueryObject> { return select_type(obj, type); },
         py::arg("type"));
+    obj.def(
+        "map",
+        [](const std::shared_ptr<QueryObject> &obj,
+           const std::function<std::shared_ptr<QueryObject>(const std::shared_ptr<QueryObject> &)>
+               &func) { return map_object(obj, func); });
+}
 
+void init_query_array(py::module &m) {
     auto array = py::class_<QueryArray, QueryObject, std::shared_ptr<QueryArray>>(m, "QueryArray");
 
     // implement array interface
@@ -162,4 +213,9 @@ void init_object(py::module &m) {
         }
         return py::str(list);
     });
+}
+
+void init_object(py::module &m) {
+    init_query_object(m);
+    init_query_array(m);
 }
