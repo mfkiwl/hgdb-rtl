@@ -245,15 +245,59 @@ bool inside_instance(const std::shared_ptr<RTLQueryObject> &obj,
     return false;
 }
 
+std::shared_ptr<QueryObject> get_source(const std::shared_ptr<QueryObject> &target) {
+    if (target->is_array()) {
+        auto const &array = std::reinterpret_pointer_cast<QueryArray>(target);
+        auto result = std::make_shared<QueryArray>();
+        for (auto const &entry : array->data) {
+            auto mapped = get_source(entry);
+            if (mapped) {
+                result->add(mapped);
+            }
+        }
+        return flatten_size_one_array(result);
+    } else {
+        auto rtl_obj = std::dynamic_pointer_cast<RTLQueryObject>(target);
+        if (!rtl_obj) return nullptr;
+        if (!PortObject::is_kind(rtl_obj->kind)) return nullptr;
+        auto port = std::reinterpret_pointer_cast<PortObject>(rtl_obj);
+        auto sources = rtl_obj->db->get_source_instances(port->port);
+        if (sources.empty()) {
+            return nullptr;
+        } else if (sources.size() == 1) {
+            auto const *inst = *sources.begin();
+            return std::make_shared<InstanceObject>(port->db, inst);
+        } else {
+            auto result = std::make_shared<QueryArray>();
+            for (auto const *inst : sources) {
+                return std::make_shared<InstanceObject>(port->db, inst);
+            }
+            return result;
+        }
+    }
+}
+
 void init_helper_functions(py::module &m) {
-    m.def("inside", [](const std::shared_ptr<QueryObject> &parent) {
-        // need to explicitly spell out the type, otherwise pybind will fail to convert
-        std::function<bool(const std::shared_ptr<RTLQueryObject> &)> func =
-            [=](const std::shared_ptr<RTLQueryObject> &obj) {
-                return inside_instance(obj, parent);
-            };
-        return func;
-    });
+    m.def(
+        "inside",
+        [](const std::shared_ptr<QueryObject> &parent) {
+            // need to explicitly spell out the type, otherwise pybind will fail to convert
+            std::function<bool(const std::shared_ptr<RTLQueryObject> &)> func =
+                [=](const std::shared_ptr<RTLQueryObject> &obj) {
+                    return inside_instance(obj, parent);
+                };
+            return func;
+        },
+        py::arg("parent"));
+
+    m.def("source", &get_source, py::arg("target"));
+
+    m.def(
+        "source_of",
+        [](const std::shared_ptr<QueryObject> &target) {
+
+        },
+        py::arg("target"));
 }
 
 void init_rtl(py::module &m) {

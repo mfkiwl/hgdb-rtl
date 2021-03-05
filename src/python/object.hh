@@ -32,4 +32,7 @@ public:
     std::vector<std::shared_ptr<QueryObject>> data;
 };
 
+// helper  functions
+std::shared_ptr<QueryObject> flatten_size_one_array(const std::shared_ptr<QueryObject> &obj);
+
 #endif  // HGDB_RTL_OBJECT_HH

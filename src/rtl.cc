@@ -173,7 +173,7 @@ private:
     slang::ArgumentDirection target_dir_;
 };
 
-std::set<const slang::InstanceSymbol *> DesignDatabase::get_connected_instance(
+std::set<const slang::InstanceSymbol *> DesignDatabase::get_connected_instances(
     const slang::InstanceSymbol *target_instance, const slang::PortSymbol *port,
     slang::ArgumentDirection direction) {
     std::set<const slang::InstanceSymbol *> result;
@@ -228,7 +228,7 @@ std::set<const slang::InstanceSymbol *> DesignDatabase::get_source_instances(
     for (auto const &port_s : ports) {
         if (slang::PortSymbol::isKind(port_s->kind)) {
             auto const &p = port_s->as<slang::PortSymbol>();
-            auto instances = get_connected_instance(instance, &p, slang::ArgumentDirection::In);
+            auto instances = get_connected_instances(instance, &p, slang::ArgumentDirection::In);
             for (auto const *inst : instances) {
                 result.emplace(inst);
             }
@@ -236,6 +236,37 @@ std::set<const slang::InstanceSymbol *> DesignDatabase::get_source_instances(
     }
 
     return result;
+}
+
+std::set<const slang::InstanceSymbol *> DesignDatabase::get_connected_instances(
+    const slang::PortSymbol *port) {
+    auto const &instance_body = port->getParentScope()->asSymbol().as<slang::InstanceBodySymbol>();
+    std::set<const slang::InstanceSymbol *> result;
+    auto parents = compilation_.getParentInstances(instance_body);
+    if (parents.empty()) return {};
+    auto const *instance = parents.back();
+    if (hierarchy_map_.find(instance) == hierarchy_map_.end()) return {};
+    auto const *parent_instance = hierarchy_map_.at(instance);
+    auto const &connections = instance->getPortConnection(*port);
+    std::set<const slang::ValueSymbol *> symbols;
+    SymbolExprVisitor visitor(symbols);
+    visitor.visitExpr(*connections->expr);
+    for (auto const *sym : symbols) {
+        InstanceConnectedVisitor v(result, sym,
+                                   port->direction == slang::ArgumentDirection::In
+                                       ? slang::ArgumentDirection::Out
+                                       : slang::ArgumentDirection::In);
+        v.visit(parent_instance);
+    }
+    return result;
+}
+
+std::set<const slang::InstanceSymbol *> DesignDatabase::get_source_instances(
+    const slang::PortSymbol *port) {
+    if (port->direction != slang::ArgumentDirection::In)
+        return {};
+    else
+        return get_connected_instances(port);
 }
 
 std::set<const slang::InstanceSymbol *> DesignDatabase::get_sink_instances(
@@ -246,7 +277,7 @@ std::set<const slang::InstanceSymbol *> DesignDatabase::get_sink_instances(
     for (auto const &port_s : ports) {
         if (slang::PortSymbol::isKind(port_s->kind)) {
             auto const &p = port_s->as<slang::PortSymbol>();
-            auto instances = get_connected_instance(instance, &p, slang::ArgumentDirection::Out);
+            auto instances = get_connected_instances(instance, &p, slang::ArgumentDirection::Out);
             for (auto const *inst : instances) {
                 result.emplace(inst);
             }
@@ -256,10 +287,34 @@ std::set<const slang::InstanceSymbol *> DesignDatabase::get_sink_instances(
     return result;
 }
 
+std::set<const slang::InstanceSymbol *> DesignDatabase::get_sink_instances(
+    const slang::PortSymbol *port) {
+    if (port->direction != slang::ArgumentDirection::Out)
+        return {};
+    else
+        return get_connected_instances(port);
+}
+
 const slang::InstanceSymbol *DesignDatabase::get_parent_instance(const slang::Symbol *symbol) {
     if (!symbol) return nullptr;
     auto const &scope = symbol->getParentScope();
     return get_instance_from_scope(scope);
+}
+
+const slang::PortSymbol *DesignDatabase::get_port(const slang::Symbol *variable) {
+    auto const *scope = variable->getParentScope();
+    auto const &scope_symbol = scope->asSymbol();
+    if (slang::InstanceBodySymbol::isKind(scope_symbol.kind)) {
+        auto const &body = scope_symbol.as<slang::InstanceBodySymbol>();
+        const auto *p = body.findPort(variable->name);
+        if (p) {
+            return &p->as<slang::PortSymbol>();
+        } else {
+            return nullptr;
+        }
+    } else {
+        return nullptr;
+    }
 }
 
 class InstanceValueVisitor : public slang::ASTVisitor<InstanceValueVisitor, false, false> {
@@ -288,7 +343,7 @@ private:
     std::unordered_map<const slang::InstanceSymbol *, const slang::InstanceSymbol *>
         &hierarchy_map_;
 
-    std::stack<const slang::InstanceSymbol*> stack_;
+    std::stack<const slang::InstanceSymbol *> stack_;
 };
 
 class VariableVisitor {

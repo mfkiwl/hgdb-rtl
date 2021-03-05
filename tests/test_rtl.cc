@@ -291,3 +291,34 @@ endmodule
     }
     EXPECT_EQ(names.size(), 4);
 }
+
+TEST_F(TestDesignDatabase, get_port_source_sink_instance) {  // NOLINT
+    load_str(R"(
+module mod1 (
+    input logic a,
+    output logic b
+);
+assign b = a;
+endmodule
+
+module top;
+logic l1, l2;
+
+mod1 inst1 (.a(l1), .b(l2));
+mod1 inst2 (.a(l2), .b(l1));
+endmodule;
+)");
+
+    auto const *a1 = design_->select("top.inst1.a");
+    auto const *p1 = design_->get_port(a1);
+    auto const *b1 = design_->select("top.inst1.b");
+    auto const *p2 = design_->get_port(b1);
+    auto const *inst2 = design_->select("top.inst2");
+    auto instances = design_->get_source_instances(p1);
+    EXPECT_EQ(instances.size(), 1);
+    EXPECT_EQ(*instances.begin(), inst2);
+
+    instances = design_->get_sink_instances(p2);
+    EXPECT_EQ(instances.size(), 1);
+    EXPECT_EQ(*instances.begin(), inst2);
+}

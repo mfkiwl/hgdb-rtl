@@ -22,13 +22,15 @@ public:
                                                                const std::string &port_name);
     static std::string get_instance_definition_name(const slang::InstanceSymbol *symbol);
     static std::string get_symbol_path(const slang::Symbol *symbol);
-    static bool symbol_inside(const slang::Symbol *child,
-                                const slang::InstanceSymbol *parent);
+    static bool symbol_inside(const slang::Symbol *child, const slang::InstanceSymbol *parent);
     std::set<const slang::InstanceSymbol *> get_source_instances(
         const slang::InstanceSymbol *instance);
+    std::set<const slang::InstanceSymbol *> get_source_instances(const slang::PortSymbol *port);
     std::set<const slang::InstanceSymbol *> get_sink_instances(
         const slang::InstanceSymbol *instance);
+    std::set<const slang::InstanceSymbol *> get_sink_instances(const slang::PortSymbol *port);
     const slang::InstanceSymbol *get_parent_instance(const slang::Symbol *symbol);
+    static const slang::PortSymbol *get_port(const slang::Symbol *variable);
 
     const std::vector<const slang::VariableSymbol *> &variables() const { return variables_; }
     const std::vector<const slang::InstanceSymbol *> &instances() const { return instances_; }
@@ -43,10 +45,12 @@ private:
     std::vector<const slang::VariableSymbol *> variables_;
 
     void index_values();
-    std::set<const slang::InstanceSymbol *> get_connected_instance(
+    std::set<const slang::InstanceSymbol *> get_connected_instances(
         const slang::InstanceSymbol *target_instance, const slang::PortSymbol *port,
         slang::ArgumentDirection direction);
     const slang::InstanceSymbol *get_instance_from_scope(const slang::Scope *scope);
+
+    std::set<const slang::InstanceSymbol *> get_connected_instances(const slang::PortSymbol *port);
 };
 
 }  // namespace hgdb::rtl

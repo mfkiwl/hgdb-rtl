@@ -13,9 +13,12 @@ struct RTLQueryObject : public QueryObject {
 public:
     enum class RTLKind { Instance, Variable, Port };
     RTLQueryObject() = delete;
-    explicit RTLQueryObject(hgdb::rtl::DesignDatabase *db, RTLKind kind) : db(db), kind(kind) {}
+    explicit RTLQueryObject(hgdb::rtl::DesignDatabase *db, const slang::Symbol *symbol,
+                            RTLKind kind)
+        : db(db), symbol(symbol), kind(kind) {}
     hgdb::rtl::DesignDatabase *db;
 
+    const slang::Symbol *symbol;
     RTLKind kind;
 };
 
@@ -23,7 +26,7 @@ struct InstanceObject : public RTLQueryObject {
 public:
     InstanceObject() = delete;
     InstanceObject(hgdb::rtl::DesignDatabase *db, const slang::InstanceSymbol *instance)
-        : RTLQueryObject(db, RTLKind::Instance), instance(instance) {}
+        : RTLQueryObject(db, instance, RTLKind::Instance), instance(instance) {}
     // this holds instance information
     const slang::InstanceSymbol *instance = nullptr;
 
@@ -36,7 +39,7 @@ struct VariableObject : public RTLQueryObject {
 public:
     VariableObject() = delete;
     VariableObject(hgdb::rtl::DesignDatabase *db, const slang::ValueSymbol *variable)
-        : RTLQueryObject(db, RTLKind::Variable), variable(variable) {}
+        : RTLQueryObject(db, variable, RTLKind::Variable), variable(variable) {}
     const slang::ValueSymbol *variable = nullptr;
 
     [[nodiscard]] std::map<std::string, std::string> values() const override;
