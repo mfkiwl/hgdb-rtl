@@ -1,5 +1,5 @@
 import os
-from ooze import Instance, Ooze, RTL, Variable, inside
+from ooze import Instance, Ooze, RTL, Variable, inside, like
 
 
 def setup_source(filename):
@@ -63,5 +63,13 @@ def test_inside_op():
     assert res == leaf
 
 
+def test_instance_select_pattern():
+    o = setup_source("test_instance_select_pattern.sv")
+    res = o.select(Instance).where(name=like(r"inst\d"))
+    assert len(res) == 2
+    res = o.select(Instance).where(name=like(r"inst\d{2,}"))
+    assert res.path == "top.inst12"
+
+
 if __name__ == "__main__":
-    test_inside_op()
+    test_instance_select_pattern()
