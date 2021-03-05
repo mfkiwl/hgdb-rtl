@@ -31,12 +31,22 @@ std::shared_ptr<QueryObject> QueryArray::map(
 
 void QueryArray::add(const std::shared_ptr<QueryObject> &obj) { data.emplace_back(obj); }
 
+std::shared_ptr<QueryObject> flatten_size_one_array(const std::shared_ptr<QueryObject> &obj) {
+    if (obj->is_array()) {
+        auto array = std::reinterpret_pointer_cast<QueryArray>(obj);
+        if (array->size() == 1) {
+            return array->get(0);
+        }
+    }
+    return obj;
+}
+
 std::shared_ptr<QueryObject> filter_query_object(
     const std::shared_ptr<QueryObject> &obj,
     const std::function<bool(const std::shared_ptr<QueryObject> &)> &func) {
     auto filter = Filter(func);
     auto r = filter.apply(obj);
-    return r;
+    return flatten_size_one_array(r);
 }
 
 std::shared_ptr<QueryObject> filter_query_object_kwargs(const std::shared_ptr<QueryObject> &obj,
@@ -54,7 +64,7 @@ std::shared_ptr<QueryObject> filter_query_object_kwargs(const std::shared_ptr<Qu
 
     auto filter = Filter(func);
     auto r = filter.apply(obj);
-    return r;
+    return flatten_size_one_array(r);
 }
 
 std::shared_ptr<QueryObject> select_type(const std::shared_ptr<QueryObject> &obj,
@@ -91,10 +101,7 @@ std::shared_ptr<QueryObject> select_type(const std::shared_ptr<QueryObject> &obj
         }
     }
     // we also flatten out one layer if it's nested size 1 loop
-    if (result->size() == 1) {
-        return result->get(0);
-    }
-    return result;
+    return flatten_size_one_array(result);
 }
 
 std::shared_ptr<QueryObject> map_object(
@@ -188,6 +195,14 @@ void init_query_object(py::module &m) {
         [](const std::shared_ptr<QueryObject> &obj,
            const std::function<std::shared_ptr<QueryObject>(const std::shared_ptr<QueryObject> &)>
                &func) { return map_object(obj, func); });
+    obj.def("__eq__",
+            [](const std::shared_ptr<QueryObject> &a, const std::shared_ptr<QueryObject> &b) {
+                return py::str(py::cast(a)).equal(py::str(py::cast(b)));
+            });
+
+    obj.def("__hash__", [](const std::shared_ptr<QueryObject> &obj) {
+        return py::hash(py::str(py::cast(obj)));
+    });
 }
 
 void init_query_array(py::module &m) {

@@ -57,10 +57,10 @@ def test_type_select():
 
 def test_inside_op():
     o = setup_source("test_inside_op.sv")
-    top = o.select(Instance).where(definition="top")
-    inst = o.select(Instance).where(path="top.inst.inst")
-    res = o.select(Instance).where(inside(top))
-    print(res)
+    leaf = o.select(Instance).where(definition="mod1")
+    inst = o.select(Instance).where(path="top.inst")
+    res = o.select(Instance).where(inside(inst))
+    assert res == leaf
 
 
 if __name__ == "__main__":

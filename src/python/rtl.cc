@@ -177,21 +177,6 @@ void init_instance_object(py::module &m) {
                                    obj.instance->getHierarchicalPath(name);
                                    return name;
                                })
-        .def("__eq__",
-             [](const InstanceObject &obj, const RTLQueryObject &other) {
-                 auto const *o = dynamic_cast<const InstanceObject *>(&other);
-                 if (o) {
-                     return o->instance == obj.instance;
-                 }
-                 return false;
-             })
-        .def("__hash__",
-             [](const InstanceObject &obj) {
-                 return
-                     // we use the instance addr as hash value, which should be consistent with the
-                     // __eq__ implementation
-                     (uint64_t)obj.instance;
-             })
         .def_property_readonly(
             "definition",
             [](const std::shared_ptr<InstanceObject> &obj) { return obj->instance->body.name; })
@@ -235,29 +220,37 @@ void init_rtl_object(py::module &m) {
         m, "RTLQueryObject");
 }
 
+bool inside_instance(const std::shared_ptr<RTLQueryObject> &obj,
+                     const std::shared_ptr<QueryObject> &parent) {
+    if (parent->is_array()) {
+        auto const &array = std::reinterpret_pointer_cast<QueryArray>(parent);
+        for (auto const &entry : array->data) {
+            if (inside_instance(obj, entry)) return true;
+        }
+    }
+    auto const &inst = std::dynamic_pointer_cast<InstanceObject>(parent);
+    if (!inst) return false;
+    auto const *instance = inst->instance;
+    switch (obj->kind) {
+        case RTLQueryObject::RTLKind::Instance: {
+            auto const &child = std::reinterpret_pointer_cast<InstanceObject>(obj);
+            return hgdb::rtl::DesignDatabase::symbol_inside(child->instance, instance);
+        }
+        case RTLQueryObject::RTLKind::Variable:
+        case RTLQueryObject::RTLKind::Port: {
+            auto const &child = std::reinterpret_pointer_cast<VariableObject>(obj);
+            return hgdb::rtl::DesignDatabase::symbol_inside(child->variable, instance);
+        }
+    }
+}
+
 void init_helper_functions(py::module &m) {
-    m.def("inside", [](const std::shared_ptr<RTLQueryObject> &parent) {
-        auto func = [=](const std::shared_ptr<RTLQueryObject> &obj) {
-            if (!InstanceObject::is_kind(parent->kind)) {
-                // vars doesn't have scope for now (interface however, can). maybe need to revisit
-                // this later
-                return false;
-            }
-            auto const &instance = std::reinterpret_pointer_cast<InstanceObject>(parent);
-            switch (obj->kind) {
-                case RTLQueryObject::RTLKind::Instance: {
-                    auto const &child = std::reinterpret_pointer_cast<InstanceObject>(obj);
-                    return hgdb::rtl::DesignDatabase::symbol_inside(child->instance,
-                                                                    instance->instance);
-                }
-                case RTLQueryObject::RTLKind::Variable:
-                case RTLQueryObject::RTLKind::Port: {
-                    auto const &child = std::reinterpret_pointer_cast<VariableObject>(obj);
-                    return hgdb::rtl::DesignDatabase::symbol_inside(child->variable,
-                                                                    instance->instance);
-                }
-            }
-        };
+    m.def("inside", [](const std::shared_ptr<QueryObject> &parent) {
+        // need to explicitly spell out the type, otherwise pybind will fail to convert
+        std::function<bool(const std::shared_ptr<RTLQueryObject> &)> func =
+            [=](const std::shared_ptr<RTLQueryObject> &obj) {
+                return inside_instance(obj, parent);
+            };
         return func;
     });
 }
