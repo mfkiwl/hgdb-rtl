@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <set>
+#include <stack>
 
 #include "fmt/format.h"
 #include "slang/binding/OperatorExpressions.h"
@@ -273,12 +274,12 @@ public:
         std::string instance_name;
         instance.getHierarchicalPath(instance_name);
         instances_.emplace(instance_name, &instance);
-        auto parent_instances = compilation_.getParentInstances(instance.body);
-        if (!parent_instances.empty()) {
-            auto const *parent = parent_instances.back();
-            hierarchy_map_.emplace(&instance, parent);
+        if (!stack_.empty()) {
+            hierarchy_map_.emplace(&instance, stack_.top());
         }
+        stack_.emplace(&instance);
         visitDefault(instance);
+        stack_.pop();
     }
 
 private:
@@ -286,6 +287,8 @@ private:
     std::unordered_map<std::string, const slang::InstanceSymbol *> &instances_;
     std::unordered_map<const slang::InstanceSymbol *, const slang::InstanceSymbol *>
         &hierarchy_map_;
+
+    std::stack<const slang::InstanceSymbol*> stack_;
 };
 
 class VariableVisitor {

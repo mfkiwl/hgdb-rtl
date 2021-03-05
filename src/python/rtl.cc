@@ -242,6 +242,7 @@ bool inside_instance(const std::shared_ptr<RTLQueryObject> &obj,
             return hgdb::rtl::DesignDatabase::symbol_inside(child->variable, instance);
         }
     }
+    return false;
 }
 
 void init_helper_functions(py::module &m) {
