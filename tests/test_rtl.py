@@ -1,5 +1,5 @@
 import os
-from ooze import Instance, Ooze, RTL
+from ooze import Instance, Ooze, RTL, Variable
 
 
 def setup_source(filename):
@@ -28,10 +28,32 @@ def test_instance_select():
 
 def test_instance_where():
     o = setup_source("test_instance_select.sv")
-    result = o.select(Instance)
-    result = result.where(lambda x: x.definition == "mod1")
+    result = o.select(Instance).where(lambda x: x.definition == "mod1")
     assert len(result) == 4
 
 
+def test_instance_select_attr():
+    o = setup_source("test_instance_select.sv")
+    result = o.select(Instance).select("path")
+    assert len(result) == 11
+    assert "top.inst6.inst4.inst2" in result
+
+
+def test_var_select():
+    o = setup_source("test_variable_select.sv")
+    result = o.select(Variable)
+    assert len(result) == 7
+    result = result.where(lambda x: x.name == "a")
+    assert len(result) == 2
+
+
+def test_type_select():
+    o = setup_source("test_variable_select.sv")
+    result = o.select(Variable, Instance)
+    assert len(result) == 2
+    result = result.select(Variable)
+    assert len(result) == 7
+
+
 if __name__ == "__main__":
-    test_instance_where()
+    test_type_select()

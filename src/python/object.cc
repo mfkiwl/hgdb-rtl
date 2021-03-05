@@ -33,10 +33,51 @@ std::shared_ptr<QueryObject> QueryArray::map(
 void QueryArray::add(const std::shared_ptr<QueryObject> &obj) { data.emplace_back(obj); }
 
 std::shared_ptr<QueryObject> filter_query_object(
-    const std::shared_ptr<QueryObject> &obj, const std::function<bool(const std::shared_ptr<QueryObject> &)> &func) {
+    const std::shared_ptr<QueryObject> &obj,
+    const std::function<bool(const std::shared_ptr<QueryObject> &)> &func) {
     auto filter = Filter(func);
     auto r = filter.apply(obj);
     return r;
+}
+
+std::shared_ptr<QueryObject> select_type(const std::shared_ptr<QueryObject> &obj,
+                                         const py::object &type) {
+    // if it's not an array it's easy
+    if (!obj->is_array()) {
+        auto py_obj = py::cast(obj);
+        if (py_obj.get_type().is(type)) {
+            return obj;
+        } else {
+            return nullptr;
+        }
+    }
+
+    auto array = std::reinterpret_pointer_cast<QueryArray>(obj);
+    auto result = std::make_shared<QueryArray>();
+    for (auto const &entry : array->data) {
+        auto py_obj = py::cast(entry);
+        if (entry->is_array()) {
+            // recursively calls itself
+            auto r = select_type(entry, type);
+            if (r->is_array()) {
+                auto const &r_array = std::reinterpret_pointer_cast<QueryArray>(r);
+                if (r_array->size() > 0) {
+                    result->add(r);
+                }
+            } else {
+                result->add(r);
+            }
+        } else {
+            if (py_obj.get_type().is(type)) {
+                result->add(entry);
+            }
+        }
+    }
+    // we also flatten out one layer if it's nested size 1 loop
+    if (result->size() == 1) {
+        return result->get(0);
+    }
+    return result;
 }
 
 void init_object(py::module &m) {
@@ -66,9 +107,38 @@ void init_object(py::module &m) {
         "where",
         [](const std::shared_ptr<QueryObject> &obj,
            const std::function<bool(const std::shared_ptr<QueryObject> &)> &func) {
-          return filter_query_object(obj, func);
+            return filter_query_object(obj, func);
         },
         py::arg("predicate"));
+    obj.def(
+        "select",
+        [](const std::shared_ptr<QueryObject> &obj, const std::string &attr) -> py::object {
+            if (obj->is_array()) {
+                // return as an array
+                auto const &array = std::reinterpret_pointer_cast<QueryArray>(obj);
+                py::list result;
+                uint64_t size = array->size();
+                for (uint64_t i = 0; i < size; i++) {
+                    auto const &entry = array->get(i);
+                    auto py_obj = py::cast(entry);
+                    auto attr_value = py_obj.attr(attr.c_str());
+                    result.append(attr_value);
+                }
+                return result;
+            } else {
+                // get the attributes
+                auto py_obj = py::cast(obj);
+                // let pybind throw exceptions
+                auto attr_value = py_obj.attr(attr.c_str());
+                return attr_value;
+            }
+        },
+        py::arg("attr_name"), py::prepend());
+    obj.def(
+        "select",
+        [](const std::shared_ptr<QueryObject> &obj, const py::object &type)
+            -> std::shared_ptr<QueryObject> { return select_type(obj, type); },
+        py::arg("type"));
 
     auto array = py::class_<QueryArray, QueryObject, std::shared_ptr<QueryArray>>(m, "QueryArray");
 
