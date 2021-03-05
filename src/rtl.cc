@@ -106,18 +106,18 @@ std::string DesignDatabase::get_instance_definition_name(const slang::InstanceSy
     return std::string(symbol->getDefinition().name);
 }
 
-std::string DesignDatabase::get_instance_path(const slang::InstanceSymbol *symbol) {
+std::string DesignDatabase::get_symbol_path(const slang::Symbol *symbol) {
     std::string result;
     symbol->getHierarchicalPath(result);
     return result;
 }
 
-bool DesignDatabase::instance_inside(const slang::InstanceSymbol *child,
-                                     const slang::InstanceSymbol *parent) {
+bool DesignDatabase::symbol_inside(const slang::Symbol *child,
+                                   const slang::InstanceSymbol *parent) {
     // there are two approaches. the easiest way is just to compare their hierarchy path
     if (!child || !parent) return false;
-    auto child_inst_name = get_instance_path(child);
-    auto parent_inst_name = get_instance_path(parent);
+    auto child_inst_name = get_symbol_path(child);
+    auto parent_inst_name = get_symbol_path(parent);
     auto pos = child_inst_name.find(parent_inst_name);
     if (pos != std::string::npos) {
         // has to have a dot afterwards
@@ -312,8 +312,8 @@ private:
 };
 
 void DesignDatabase::index_values() {
-    //InstanceVisitor visitor(instances_map_, hierarchy_map_);
-    //visitor.visit(compilation_.getRoot());
+    // InstanceVisitor visitor(instances_map_, hierarchy_map_);
+    // visitor.visit(compilation_.getRoot());
     InstanceValueVisitor visitor(compilation_, instances_map_, hierarchy_map_);
     visitor.visit(compilation_.getRoot());
 

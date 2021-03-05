@@ -107,11 +107,11 @@ endmodule
 
     auto const *inst = design_->get_instance(inst_path);
     EXPECT_NE(inst, nullptr);
-    auto path = design_->get_instance_path(inst);
+    auto path = design_->get_symbol_path(inst);
     EXPECT_EQ(path, inst_path);
 }
 
-TEST_F(TestDesignDatabase, is_inside) {  // NOLINT
+TEST_F(TestDesignDatabase, is_inside_instance) {  // NOLINT
     load_str(R"(
 module child1;
 endmodule
@@ -126,10 +126,34 @@ endmodule
 
     auto const *inst1 = design_->get_instance("top.inst1");
     auto const *inst2 = design_->get_instance("top");
-    EXPECT_TRUE(design_->instance_inside(inst1, inst2));
+    EXPECT_TRUE(design_->symbol_inside(inst1, inst2));
     auto const *inst3 = design_->get_instance("top.inst2.inst1");
-    EXPECT_TRUE(design_->instance_inside(inst3, inst2));
-    EXPECT_FALSE(design_->instance_inside(inst3, inst1));
+    EXPECT_TRUE(design_->symbol_inside(inst3, inst2));
+    EXPECT_FALSE(design_->symbol_inside(inst3, inst1));
+}
+
+TEST_F(TestDesignDatabase, is_inside_variable) {    // NOLINT
+    load_str(R"(
+module child1;
+logic a;
+endmodule
+module child2;
+logic b;
+child1 inst1();
+endmodule
+module top;
+logic c;
+child1 inst1();
+child2 inst2();
+endmodule
+)");
+    auto const *inst1 = design_->get_instance("top.inst1");
+    auto const *inst2 = design_->get_instance("top");
+    auto const *inst3 = design_->get_instance("top.inst2.inst1");
+    auto const *a = design_->select("top.inst1.a");
+    EXPECT_TRUE(design_->symbol_inside(a, inst1));
+    EXPECT_TRUE(design_->symbol_inside(a, inst2));
+    EXPECT_FALSE(design_->symbol_inside(a, inst3));
 }
 
 TEST_F(TestDesignDatabase, get_source_instances_var) {  // NOLINT

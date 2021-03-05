@@ -21,8 +21,8 @@ public:
     std::set<const slang::ValueSymbol *> get_connected_symbols(const std::string &path,
                                                                const std::string &port_name);
     static std::string get_instance_definition_name(const slang::InstanceSymbol *symbol);
-    static std::string get_instance_path(const slang::InstanceSymbol *symbol);
-    static bool instance_inside(const slang::InstanceSymbol *child,
+    static std::string get_symbol_path(const slang::Symbol *symbol);
+    static bool symbol_inside(const slang::Symbol *child,
                                 const slang::InstanceSymbol *parent);
     std::set<const slang::InstanceSymbol *> get_source_instances(
         const slang::InstanceSymbol *instance);
