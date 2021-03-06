@@ -21,6 +21,9 @@ std::shared_ptr<QueryObject> QueryArray::map(
     auto len = size();
     for (uint64_t i = 0; i < len; i++) {
         auto obj = get(i);
+        // cast it here so that it will register in python
+        auto py_obj = py::cast(obj);
+        (void)(py_obj);
         auto new_obj = mapper(obj.get());
         if (new_obj) {
             result->add(new_obj);
@@ -228,6 +231,7 @@ void init_query_array(py::module &m) {
         }
         return py::str(list);
     });
+    array.def("map", &QueryArray::map, py::arg("predicate"));
 }
 
 void init_object(py::module &m) {

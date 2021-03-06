@@ -306,7 +306,7 @@ logic l1, l2;
 
 mod1 inst1 (.a(l1), .b(l2));
 mod1 inst2 (.a(l2), .b(l1));
-endmodule;
+endmodule
 )");
 
     auto const *a1 = design_->select("top.inst1.a");

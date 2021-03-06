@@ -1,5 +1,5 @@
 import os
-from ooze import Instance, Ooze, RTL, Variable, inside, like
+from ooze import Instance, Ooze, RTL, Variable, Port, inside, like, source, source_of
 
 
 def setup_source(filename):
@@ -71,5 +71,18 @@ def test_instance_select_pattern():
     assert res.path == "top.inst12"
 
 
+def test_port_source():
+    o = setup_source("test_port_source.sv")
+    res = o.select(Variable).map(source)
+    assert len(res) == 2
+    res = o.select(Variable).where(path="top.inst1.a").map(source)
+    assert res.path == "top.inst2"
+
+    # test source of filter
+    a = o.select(Port).where(path="top.inst1.a")
+    res = o.select(Instance).where(source_of(a))
+    assert res.path == "top.inst2"
+
+
 if __name__ == "__main__":
-    test_instance_select_pattern()
+    test_port_source()

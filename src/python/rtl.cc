@@ -171,12 +171,6 @@ void init_instance_object(py::module &m) {
         py::class_<InstanceObject, RTLQueryObject, std::shared_ptr<InstanceObject>>(m, "Instance");
     // we don't allow users to construct it by themself
     cls.def_property_readonly("name", [](const InstanceObject &obj) { return obj.instance->name; })
-        .def_property_readonly("path",
-                               [](const InstanceObject &obj) {
-                                   std::string name;
-                                   obj.instance->getHierarchicalPath(name);
-                                   return name;
-                               })
         .def_property_readonly(
             "definition",
             [](const std::shared_ptr<InstanceObject> &obj) { return obj->instance->body.name; })
@@ -218,6 +212,11 @@ void init_port_object(py::module &m) {
 void init_rtl_object(py::module &m) {
     auto cls = py::class_<RTLQueryObject, QueryObject, std::shared_ptr<RTLQueryObject>>(
         m, "RTLQueryObject");
+    cls.def_property_readonly("path", [](const RTLQueryObject &obj) {
+        std::string name;
+        obj.symbol->getHierarchicalPath(name);
+        return name;
+    });
 }
 
 bool inside_instance(const std::shared_ptr<RTLQueryObject> &obj,
@@ -259,22 +258,56 @@ std::shared_ptr<QueryObject> get_source(const std::shared_ptr<QueryObject> &targ
     } else {
         auto rtl_obj = std::dynamic_pointer_cast<RTLQueryObject>(target);
         if (!rtl_obj) return nullptr;
-        if (!PortObject::is_kind(rtl_obj->kind)) return nullptr;
-        auto port = std::reinterpret_pointer_cast<PortObject>(rtl_obj);
-        auto sources = rtl_obj->db->get_source_instances(port->port);
+        // notice that variable can be upgraded to port
+        const slang::PortSymbol *port_symbol = hgdb::rtl::DesignDatabase::get_port(rtl_obj->symbol);
+        if (!port_symbol) {
+            return nullptr;
+        }
+        auto sources = rtl_obj->db->get_source_instances(port_symbol);
         if (sources.empty()) {
             return nullptr;
         } else if (sources.size() == 1) {
             auto const *inst = *sources.begin();
-            return std::make_shared<InstanceObject>(port->db, inst);
+            return std::make_shared<InstanceObject>(rtl_obj->db, inst);
         } else {
             auto result = std::make_shared<QueryArray>();
             for (auto const *inst : sources) {
-                return std::make_shared<InstanceObject>(port->db, inst);
+                return std::make_shared<InstanceObject>(rtl_obj->db, inst);
             }
             return result;
         }
     }
+}
+
+bool get_source_of_helper(const std::shared_ptr<QueryObject> &target,
+                          const std::shared_ptr<QueryObject> &obj) {
+    // recursive helper
+    if (target->is_array()) {
+        auto const &array = std::reinterpret_pointer_cast<QueryArray>(target);
+        for (auto const &entry : array->data) {
+            auto r = get_source_of_helper(target, entry);
+            if (r) return true;
+        }
+    } else {
+        // we will try to upgrade the symbol to port if possible
+        auto target_symbol = std::dynamic_pointer_cast<VariableObject>(target);
+        if (!target_symbol) return false;
+        auto const *port = hgdb::rtl::DesignDatabase::get_port(target_symbol->symbol);
+        if (!port) return false;
+        auto obj_inst = std::dynamic_pointer_cast<InstanceObject>(obj);
+        if (!obj_inst) return false;
+        auto sources = target_symbol->db->get_source_instances(port);
+        return sources.find(obj_inst->instance) != sources.end();
+    }
+    return false;
+}
+
+std::function<bool(const std::shared_ptr<QueryObject> &)> get_source_of(
+    const std::shared_ptr<QueryObject> &target) {
+    auto result = [=](const std::shared_ptr<QueryObject> &obj) -> bool {
+        return get_source_of_helper(target, obj);
+    };
+    return result;
 }
 
 void init_helper_functions(py::module &m) {
@@ -294,9 +327,7 @@ void init_helper_functions(py::module &m) {
 
     m.def(
         "source_of",
-        [](const std::shared_ptr<QueryObject> &target) {
-
-        },
+        [](const std::shared_ptr<QueryObject> &target) { return get_source_of(target); },
         py::arg("target"));
 }
 
