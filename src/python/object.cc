@@ -144,7 +144,11 @@ void init_query_object(py::module &m) {
         py::dict dict;
         auto const values = obj.values();
         for (auto const &[name, value] : values) {
-            dict[name.c_str()] = value;
+            if (std::all_of(value.begin(), value.end(), isdigit)) {
+                dict[name.c_str()] = py::int_(std::stoul(value));
+            } else {
+                dict[name.c_str()] = value;
+            }
         }
         return py::str(dict);
     });
