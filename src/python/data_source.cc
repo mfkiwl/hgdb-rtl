@@ -37,5 +37,5 @@ void init_data_source(py::module &m) {
                 }
             }
             return query_array->size() == 1 ? query_array->get(0) : query_array;
-        });
+        }, py::arg("types"));
 }

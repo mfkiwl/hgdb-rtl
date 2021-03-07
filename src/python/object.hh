@@ -10,6 +10,7 @@ public:
         const std::function<std::shared_ptr<QueryObject>(QueryObject *)> &mapper);
     [[nodiscard]] virtual std::map<std::string, std::string> values() const { return {}; }
     [[nodiscard]] virtual bool is_array() const { return false; }
+    [[nodiscard]] virtual std::string str() const { return ""; }
 };
 
 struct QueryArray : public QueryObject {

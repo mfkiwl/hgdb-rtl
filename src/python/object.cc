@@ -136,6 +136,9 @@ void init_query_object(py::module &m) {
     auto obj = py::class_<QueryObject, std::shared_ptr<QueryObject>>(m, "QueryObject");
     obj.def("map", &QueryObject::map);
     obj.def("__repr__", [](const QueryObject &obj) {
+        // if str() is not implemented, we create values from the dict
+        auto s = obj.str();
+        if (!s.empty()) return py::str(s);
         // pretty print the values
         // we will just use json to print out stuff
         py::dict dict;

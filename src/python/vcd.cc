@@ -34,6 +34,42 @@ std::shared_ptr<QueryArray> VCD::get_selector(py::handle handle) {
     return nullptr;
 }
 
+class VCDValue : public QueryObject {};
+
+// we define Int and str wrapper for VCD values
+class UIntValue : public VCDValue {
+public:
+    explicit UIntValue(uint64_t v) : value(v) {}
+    uint64_t value;
+
+    [[nodiscard]] std::string str() const override { return std::to_string(value); }
+};
+
+class StringValue : public VCDValue {
+public:
+    explicit StringValue(std::string value) : value(std::move(value)) {}
+
+    std::string value;
+    [[nodiscard]] std::string str() const override { return value; }
+};
+
+std::function<std::shared_ptr<VCDValue>(const std::shared_ptr<VCDSignal> &)> get_value(
+    uint64_t time, bool use_str = false) {
+    auto func = [time, use_str](const std::shared_ptr<VCDSignal> &s) {
+        std::shared_ptr<VCDValue> ptr;
+        if (use_str) {
+            auto v = s->signal->get_value(time);
+            ptr = std::make_shared<StringValue>(v);
+        } else {
+            auto v = s->signal->get_uint_value(time);
+            ptr = std::make_shared<UIntValue>(v);
+        }
+        return ptr;
+    };
+
+    return func;
+}
+
 void init_vcd(py::module &m) {
     auto vcd = py::class_<VCDSignal, QueryObject, std::shared_ptr<VCDSignal>>(m, "VCDSignal");
     vcd.def_property_readonly("path", [](const VCDSignal &s) { return s.path; });
@@ -41,4 +77,8 @@ void init_vcd(py::module &m) {
 
     auto source = py::class_<VCD, DataSource, std::shared_ptr<VCD>>(m, "VCD");
     source.def(py::init<const std::string>());
+
+    m.def("get_value", &get_value, py::arg("time"), py::arg("use_str"));
+    m.def(
+        "get_value", [](uint64_t time) { return get_value(time, false); }, py::arg("time"));
 }
