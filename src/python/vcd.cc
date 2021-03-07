@@ -15,7 +15,7 @@ VCD::VCD(const std::string &path) : DataSource(DataSourceType::ValueChange) {
 }
 
 std::shared_ptr<QueryArray> create_signal_array(const hgdb::vcd::VCDDatabase &db) {
-    std::shared_ptr<QueryArray> result;
+    auto result = std::make_shared<QueryArray>();
     for (auto const &[id, signal] : db.signals) {
         auto s = std::make_shared<VCDSignal>();
         s->name = signal->name;
@@ -76,9 +76,14 @@ void init_vcd(py::module &m) {
     vcd.def_property_readonly("name", [](const VCDSignal &s) { return s.name; });
 
     auto source = py::class_<VCD, DataSource, std::shared_ptr<VCD>>(m, "VCD");
-    source.def(py::init<const std::string>());
+    source.def(py::init<const std::string>(), py::arg("filename"));
 
     m.def("get_value", &get_value, py::arg("time"), py::arg("use_str"));
     m.def(
         "get_value", [](uint64_t time) { return get_value(time, false); }, py::arg("time"));
+
+    auto value = py::class_<VCDValue, QueryObject, std::shared_ptr<VCDValue>>(m, "VCDValue");
+    auto uint = py::class_<UIntValue, VCDValue, std::shared_ptr<UIntValue>>(m, "UIntValue");
+    uint.def("__int__", [](const UIntValue &v) { return v.value; });
+    auto str = py::class_<StringValue, VCDValue, std::shared_ptr<StringValue>>(m, "StringValue");
 }

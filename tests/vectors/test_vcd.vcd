@@ -1,5 +1,5 @@
 $date
-    Mar  6, 2021  20:10:15
+    Mar  6, 2021  20:56:34
 $end
 $version
     TOOL:	xmsim(64)	20.09-s007
@@ -12,6 +12,13 @@ $scope module top $end
 $var reg       1 !    clk $end
 $var reg      16 "    a [15:0] $end
 $var reg      16 #    b [15:0] $end
+
+$scope module dut $end
+$var wire      1 $    clk  $end
+$var wire     16 %    a [15:0] $end
+$var reg      16 &    b [15:0] $end
+$upscope $end
+
 $upscope $end
 
 $enddefinitions $end
@@ -19,51 +26,99 @@ $dumpvars
 0!
 b0 "
 bx #
+0$
+b0 %
+bx &
 $end
 #5
 1!
 b1 "
+b1 %
+1$
+b1 &
+b1 #
 #10
 0!
+0$
 #15
 1!
 b10 "
+b10 %
+1$
+b10 &
+b10 #
 #20
 0!
+0$
 #25
 1!
 b11 "
+b11 %
+1$
+b11 &
+b11 #
 #30
 0!
+0$
 #35
 1!
 b100 "
+b100 %
+1$
+b100 &
+b100 #
 #40
 0!
+0$
 #45
 1!
 b101 "
+b101 %
+1$
+b101 &
+b101 #
 #50
 0!
+0$
 #55
 1!
 b110 "
+b110 %
+1$
+b110 &
+b110 #
 #60
 0!
+0$
 #65
 1!
 b111 "
+b111 %
+1$
+b111 &
+b111 #
 #70
 0!
+0$
 #75
 1!
 b1000 "
+b1000 %
+1$
+b1000 &
+b1000 #
 #80
 0!
+0$
 #85
 1!
 b1001 "
+b1001 %
+1$
+b1001 &
+b1001 #
 #90
 0!
+0$
 #95
 1!

@@ -16,6 +16,8 @@ module top;
 logic clk;
 logic [15:0] a, b;
 
+mod dut (.*);
+
 initial clk = 0;
 always clk = #5 ~clk;
 

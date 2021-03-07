@@ -7,7 +7,10 @@ def test_vcd_read(get_vector_file):
     o = Ooze()
     o.add_source(vcd)
     res = o.select(VCDSignal)
-    print(res)
+    assert len(res) == 3 * 2
+    value = get_value(10)
+    res = res.map(value)
+    assert int(res[1]) == 2
 
 
 if __name__ == "__main__":
