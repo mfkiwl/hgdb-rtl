@@ -131,13 +131,115 @@ std::shared_ptr<QueryObject> map_object(
 
 class GenericQueryObject : public QueryObject {
 public:
+    GenericQueryObject() = default;
+    explicit GenericQueryObject(const std::shared_ptr<QueryObject> &obj) {
+        if (obj->is_array()) throw std::runtime_error("Cannot convert an array to generic object");
+        auto const values = obj->values();
+        for (auto const &[key, value] : values) {
+            add_attr(key, value);
+        }
+    }
+
     std::map<std::string, py::object> attrs;
+
+    void add_attr(const std::string &key, const std::string &value) {
+        if (std::all_of(value.begin(), value.end(), isdigit)) {
+            auto v = py::cast(std::stol(value));
+            attrs.emplace(key, v);
+        } else {
+            attrs.emplace(key, py::cast(value));
+        }
+    }
 };
 
 class GenericAttributeError : public std::runtime_error {
 public:
-    GenericAttributeError(const std::string &str) : std::runtime_error(str) {}
+    explicit GenericAttributeError(const std::string &str) : std::runtime_error(str) {}
 };
+
+void compute_hash_keys(const std::vector<std::string> &join_keys,
+                       const std::shared_ptr<QueryArray> &array,
+                       std::map<uint64_t, std::vector<std::shared_ptr<QueryObject>>> &hash_map) {
+    for (auto const &entry : array->data) {
+        if (entry->is_array()) {
+            throw std::runtime_error(
+                "Multi-dimensional array join not supported. Please flatten the array first!");
+        }
+        auto py_obj = py::cast(entry);
+        // need to use each join keys to figure out the actual hash
+        uint64_t hash = 0;
+        bool no_key = false;
+        for (uint64_t i = 0; i < join_keys.size(); i++) {
+            auto const &key = join_keys[i];
+            if (py::hasattr(py_obj, key.c_str())) {
+                auto h = py::hash(py_obj.attr(key.c_str()));
+                hash ^= h << i;
+            } else {
+                no_key = true;
+                break;
+            }
+        }
+        if (!no_key) {
+            hash_map[hash].emplace_back(entry);
+        }
+    }
+}
+
+std::shared_ptr<QueryObject> merge_object(const std::shared_ptr<QueryObject> &obj1,
+                                          const std::shared_ptr<QueryObject> &obj2) {
+    auto result = std::make_shared<GenericQueryObject>(obj1);
+    auto const values = obj2->values();
+    for (auto const &[key, value] : values) {
+        if (result->attrs.find(key) == result->attrs.end()) {
+            result->add_attr(key, value);
+        }
+    }
+
+    return result;
+}
+
+std::shared_ptr<QueryObject> join_object(const std::shared_ptr<QueryObject> &obj1,
+                                         const std::shared_ptr<QueryObject> &obj2,
+                                         const std::vector<std::string> &join_keys) {
+    auto result = std::make_shared<QueryArray>();
+    std::shared_ptr<QueryArray> array1, array2;
+    // we turn two objects into arrays
+    if (obj1->is_array()) {
+        array1 = std::reinterpret_pointer_cast<QueryArray>(obj1);
+    } else {
+        array1 = std::make_shared<QueryArray>();
+        array1->add(obj1);
+    }
+    if (obj2->is_array()) {
+        array2 = std::reinterpret_pointer_cast<QueryArray>(obj2);
+    } else {
+        array2 = std::make_shared<QueryArray>();
+        array2->add(obj2);
+    }
+
+    // we use hash join
+    std::map<uint64_t, std::vector<std::shared_ptr<QueryObject>>> hash1;
+    std::map<uint64_t, std::vector<std::shared_ptr<QueryObject>>> hash2;
+
+    compute_hash_keys(join_keys, array1, hash1);
+    compute_hash_keys(join_keys, array2, hash2);
+
+    // compute the result
+    for (auto const &[hash, result1] : hash1) {
+        if (hash2.find(hash) != hash2.end()) {
+            auto const &result2 = hash2.at(hash);
+            // do a cross product here
+            for (auto const &entry1 : result1) {
+                for (auto const &entry2 : result2) {
+                    auto r = merge_object(entry1, entry2);
+                    result->add(r);
+                }
+            }
+        }
+    }
+
+    return flatten_size_one_array(result);
+}
 
 std::shared_ptr<QueryObject> query_object_select(const std::shared_ptr<QueryObject> &obj,
                                                  const py::args &args) {
@@ -275,7 +377,7 @@ void init_generic_query_object(py::module &m) {
     });
     // we translate our custom attribute error to standard attribute error
     py::register_exception<GenericAttributeError>(m, "GenericAttributeError", PyExc_AttributeError);
-    py::register_exception_translator([](std::exception_ptr p) {    // NOLINT
+    py::register_exception_translator([](std::exception_ptr p) {  // NOLINT
         try {
             if (p) std::rethrow_exception(p);
         } catch (const GenericAttributeError &e) {
@@ -291,6 +393,8 @@ void init_generic_query_object(py::module &m) {
         }
         return obj.attrs.at(name);
     });
+
+    // join option
 }
 
 void init_object(py::module &m) {
