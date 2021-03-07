@@ -29,7 +29,7 @@ std::shared_ptr<QueryObject> QueryArray::map(
             result->add(new_obj);
         }
     }
-    return std::move(result);
+    return result;
 }
 
 void QueryArray::add(const std::shared_ptr<QueryObject> &obj) { data.emplace_back(obj); }

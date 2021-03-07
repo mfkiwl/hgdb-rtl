@@ -163,7 +163,7 @@ std::unique_ptr<InstanceObject> get_parent_instance(const T &obj) {
 
     if (!inst) return nullptr;
     auto ptr = std::make_unique<InstanceObject>(obj.db, inst);
-    return std::move(ptr);
+    return ptr;
 }
 
 void init_instance_object(py::module &m) {
