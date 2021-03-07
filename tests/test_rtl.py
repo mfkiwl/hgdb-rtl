@@ -28,6 +28,7 @@ def test_instance_select_attr(get_vector_file):
     o = setup_source("test_instance_select.sv", get_vector_file)
     result = o.select(Instance).select("path")
     assert len(result) == 11
+    result = [r.path for r in result]
     assert "top.inst6.inst4.inst2" in result
 
 

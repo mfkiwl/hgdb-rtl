@@ -37,7 +37,9 @@ void QueryArray::add(const std::shared_ptr<QueryObject> &obj) { data.emplace_bac
 std::shared_ptr<QueryObject> flatten_size_one_array(const std::shared_ptr<QueryObject> &obj) {
     if (obj->is_array()) {
         auto array = std::reinterpret_pointer_cast<QueryArray>(obj);
-        if (array->size() == 1) {
+        if (array->empty()) {
+            return nullptr;
+        } else if (array->size() == 1) {
             return array->get(0);
         }
     }
@@ -89,6 +91,7 @@ std::shared_ptr<QueryObject> select_type(const std::shared_ptr<QueryObject> &obj
         if (entry->is_array()) {
             // recursively calls itself
             auto r = select_type(entry, type);
+            if (!r) continue;
             if (r->is_array()) {
                 auto const &r_array = std::reinterpret_pointer_cast<QueryArray>(r);
                 if (!r_array->empty()) {
@@ -119,16 +122,58 @@ std::shared_ptr<QueryObject> map_object(
                 result->add(o);
             }
         }
-        if (result->empty()) {
-            return nullptr;
-        } else if (result->size() == 1) {
-            return result->get(0);
-        } else {
-            return result;
-        }
+        return flatten_size_one_array(result);
     } else {
         auto o = func(obj);
         return o;
+    }
+}
+
+class GenericQueryObject : public QueryObject {
+public:
+    std::map<std::string, py::object> attrs;
+};
+
+class GenericAttributeError : public std::runtime_error {
+public:
+    GenericAttributeError(const std::string &str) : std::runtime_error(str) {}
+};
+
+std::shared_ptr<QueryObject> query_object_select(const std::shared_ptr<QueryObject> &obj,
+                                                 const py::args &args) {
+    if (args.size() == 1) {
+        // only one of them, try if it's a type
+        py::object t = args[0];
+        // a little bit hacky here since pybind doesn't provide `type` primitive
+        auto tp_name = std::string(t.ptr()->ob_type->tp_name);
+        if (tp_name == "pybind11_type") {
+            auto r = select_type(obj, t);
+            return r;
+        }
+    }
+    if (obj->is_array()) {
+        auto array = std::reinterpret_pointer_cast<QueryArray>(obj);
+        auto r = std::make_shared<QueryArray>();
+        for (auto const &entry : array->data) {
+            auto selected = query_object_select(entry, args);
+            r->add(selected);
+        }
+        return flatten_size_one_array(r);
+    } else {
+        // based on whether it is an array or not
+        // create a generic object based on each arg select
+        auto r = std::make_shared<GenericQueryObject>();
+        auto py_obj = py::cast(obj);
+        auto res = py::cast(r);
+        for (auto const &arg : args) {
+            auto value = py::getattr(py_obj, arg);
+            auto arg_str = py::cast<std::string>(arg);
+            // notice that the following doesn't work with Python
+            // res.attr(arg) = value;
+            // as a result, we have to fold everything into the attr
+            r->attrs.emplace(arg_str, value);
+        }
+        return r;
     }
 }
 
@@ -171,35 +216,7 @@ void init_query_object(py::module &m) {
         },
         py::arg("predicate"));
     obj.def("where", &filter_query_object_kwargs);
-    obj.def(
-        "select",
-        [](const std::shared_ptr<QueryObject> &obj, const std::string &attr) -> py::object {
-            if (obj->is_array()) {
-                // return as an array
-                auto const &array = std::reinterpret_pointer_cast<QueryArray>(obj);
-                py::list result;
-                uint64_t size = array->size();
-                for (uint64_t i = 0; i < size; i++) {
-                    auto const &entry = array->get(i);
-                    auto py_obj = py::cast(entry);
-                    auto attr_value = py_obj.attr(attr.c_str());
-                    result.append(attr_value);
-                }
-                return result;
-            } else {
-                // get the attributes
-                auto py_obj = py::cast(obj);
-                // let pybind throw exceptions
-                auto attr_value = py_obj.attr(attr.c_str());
-                return attr_value;
-            }
-        },
-        py::arg("attr_name"), py::prepend());
-    obj.def(
-        "select",
-        [](const std::shared_ptr<QueryObject> &obj, const py::object &type)
-            -> std::shared_ptr<QueryObject> { return select_type(obj, type); },
-        py::arg("type"));
+    obj.def("select", &query_object_select);
     obj.def(
         "map",
         [](const std::shared_ptr<QueryObject> &obj,
@@ -241,7 +258,43 @@ void init_query_array(py::module &m) {
     array.def("map", &QueryArray::map, py::arg("predicate"));
 }
 
+void init_generic_query_object(py::module &m) {
+    // as stated here:
+    // https://pybind11.readthedocs.io/en/stable/classes.html#dynamic-attributes
+    // we pay a little bit performance cost, which makes the performance the same as native
+    // Python due to the usage or dynamic attributes
+    auto obj = py::class_<GenericQueryObject, QueryObject, std::shared_ptr<GenericQueryObject>>(
+        m, "GenericQueryObject", py::dynamic_attr());
+    // custom repr logic to show all attributes
+    obj.def("__repr__", [](const GenericQueryObject &obj) {
+        py::dict dict;
+        for (auto const &[name, value] : obj.attrs) {
+            dict[name.c_str()] = value;
+        }
+        return py::str(dict);
+    });
+    // we translate our custom attribute error to standard attribute error
+    py::register_exception<GenericAttributeError>(m, "GenericAttributeError", PyExc_AttributeError);
+    py::register_exception_translator([](std::exception_ptr p) {    // NOLINT
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const GenericAttributeError &e) {
+            PyErr_SetString(PyExc_AttributeError, e.what());
+        }
+    });
+    // get attribute
+    obj.def("__getattr__", [](const GenericQueryObject &obj, const std::string &name) {
+        if (obj.attrs.find(name) == obj.attrs.end()) {
+            // this will throw an error
+            std::string error = "Object has no attribute '" + name + "'";
+            throw GenericAttributeError(error);
+        }
+        return obj.attrs.at(name);
+    });
+}
+
 void init_object(py::module &m) {
     init_query_object(m);
     init_query_array(m);
+    init_generic_query_object(m);
 }
