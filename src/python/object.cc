@@ -348,7 +348,14 @@ void init_query_array(py::module &m) {
         }
         return py::str(list);
     });
-    array.def("map", &QueryArray::map, py::arg("predicate"));
+
+    // we also take a list of query objects and make it into a query array
+    array.def(py::init([](std::vector<std::shared_ptr<QueryObject>> values) {
+                  auto r = std::make_shared<QueryArray>();
+                  r->data = std::move(values);
+                  return r;
+              }),
+              py::arg("values"));
 }
 
 void init_generic_query_object(py::module &m) {
@@ -366,6 +373,14 @@ void init_generic_query_object(py::module &m) {
         }
         return py::str(dict);
     });
+    // we allow a generic query object to be constructed from dict
+    obj.def(py::init([](std::map<std::string, py::object> attrs) {
+                auto r = std::make_shared<GenericQueryObject>();
+                r->attrs = std::move(attrs);
+                return r;
+            }),
+            py::arg("attributes"));
+
     // we translate our custom attribute error to standard attribute error
     py::register_exception<GenericAttributeError>(m, "GenericAttributeError", PyExc_AttributeError);
     py::register_exception_translator([](std::exception_ptr p) {  // NOLINT
