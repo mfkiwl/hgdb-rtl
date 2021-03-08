@@ -21,9 +21,9 @@ def test_vcd_pre_value(get_vector_file):
     res = o.select(VCDSignal)
     value = get_value(20)
     res = res.map(value)
-    print(res)
+    assert res[0].time == 20
     res = res.map(pre_value)
-    print(res)
+    assert res[0].time == 15
 
 
 if __name__ == "__main__":

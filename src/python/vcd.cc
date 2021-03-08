@@ -151,8 +151,11 @@ void init_vcd(py::module &m) {
 
     auto value = py::class_<VCDValue, QueryObject, std::shared_ptr<VCDValue>>(m, "VCDValue");
     value.def_property_readonly("path", [](const VCDValue &v) { return v.path; });
+    value.def_property_readonly("time", [](VCDValue &v) { return v.time; });
+
     auto uint = py::class_<UIntValue, VCDValue, std::shared_ptr<UIntValue>>(m, "UIntValue");
     uint.def("__int__", [](const UIntValue &v) { return v.value; });
+
     auto str = py::class_<StringValue, VCDValue, std::shared_ptr<StringValue>>(m, "StringValue");
     str.def("__str__", [](const StringValue &s) { return s.value; });
 }
