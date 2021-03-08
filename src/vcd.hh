@@ -17,7 +17,7 @@ public:
     std::string path;
     std::string name;
     // this is ordered
-    std::map<uint64_t, std::string> raw_values;
+    std::map<uint64_t, std::string> *raw_values;
 
     std::string get_value(uint64_t time) const;
 
@@ -34,9 +34,12 @@ public:
 
     // if the file is big, we might need to use lazy eval to handle
     // memory usage
-    std::map<std::string, std::shared_ptr<VCDSignal>> signals;
+    // path -> signal
+    std::unordered_map<std::string, std::shared_ptr<VCDSignal>> signals;
     // used to access time we need to query
     std::set<uint64_t> times;
+    // hold the actual values
+    std::unordered_map<std::string, std::map<uint64_t, std::string>> values;
 };
 
 }

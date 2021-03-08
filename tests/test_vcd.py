@@ -2,7 +2,7 @@ from ooze import Ooze, VCD, VCDSignal, get_value, pre_value
 
 
 def setup_vcd(get_vector_file, vcd_file):
-    vcd_file = get_vector_file("test_vcd.vcd")
+    vcd_file = get_vector_file(vcd_file)
     vcd = VCD(vcd_file)
     o = Ooze()
     o.add_source(vcd)
@@ -34,7 +34,7 @@ def test_vcd_bind(get_vector_file):
     s = o.bind(obj, VCDSignal)
     value = get_value(20)
     res = s.map(value)
-    print(res)
+    assert res.time == 20
 
 
 if __name__ == "__main__":
