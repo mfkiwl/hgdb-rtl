@@ -1,4 +1,4 @@
-from ooze import Ooze, VCD, VCDSignal, get_value
+from ooze import Ooze, VCD, VCDSignal, get_value, pre_value
 
 
 def test_vcd_read(get_vector_file):
@@ -13,6 +13,19 @@ def test_vcd_read(get_vector_file):
     assert int(res[1]) == 2
 
 
+def test_vcd_pre_value(get_vector_file):
+    vcd_file = get_vector_file("test_vcd.vcd")
+    vcd = VCD(vcd_file)
+    o = Ooze()
+    o.add_source(vcd)
+    res = o.select(VCDSignal)
+    value = get_value(20)
+    res = res.map(value)
+    print(res)
+    res = res.map(pre_value)
+    print(res)
+
+
 if __name__ == "__main__":
     from conftest import get_vector_file_fn
-    test_vcd_read(get_vector_file_fn)
+    test_vcd_pre_value(get_vector_file_fn)

@@ -7,7 +7,7 @@
 
 namespace hgdb::vcd {
 
-std::string VCDSignal::get_value(uint64_t time) {
+std::string VCDSignal::get_value(uint64_t time) const {
     // map is a b-tree
     auto const &ref_time = raw_values.lower_bound(time);
     if (ref_time != raw_values.end()) {
@@ -17,7 +17,7 @@ std::string VCDSignal::get_value(uint64_t time) {
     }
 }
 
-uint64_t VCDSignal::get_uint_value(uint64_t time) {
+uint64_t VCDSignal::get_uint_value(uint64_t time) const {
     std::string raw_value = get_value(time);
     uint64_t bits = raw_value.size();
     uint64_t result = 0;
@@ -56,6 +56,7 @@ VCDDatabase::VCDDatabase(const std::string &filename) {
         signal->identifier = def.identifier;
         signal->path = path;
         signal->name = def.name;
+        signal->db = this;
         signals.emplace(def.identifier, signal);
     });
 
@@ -63,6 +64,8 @@ VCDDatabase::VCDDatabase(const std::string &filename) {
         auto &signal = this->signals.at(value.identifier);
         signal->raw_values.emplace(value.time, value.value);
     });
+
+    parser.set_on_time_change([this](uint64_t time) { times.emplace(time); });
 
     parser.parse();
 }
