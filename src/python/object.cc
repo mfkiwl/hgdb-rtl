@@ -332,6 +332,16 @@ void init_query_object(py::module &m) {
     obj.def("__hash__", [](const std::shared_ptr<QueryObject> &obj) {
         return py::hash(py::str(py::cast(obj)));
     });
+
+    // join option
+    obj.def(
+        "join",
+        [](const std::shared_ptr<QueryObject> &obj, const std::shared_ptr<QueryObject> &other,
+           const py::args &keys) {
+            auto join_keys = py::cast<std::vector<std::string>>(keys);
+            return join_object(obj, other, join_keys);
+        },
+        py::arg("other"));
 }
 
 void init_query_array(py::module &m) {
@@ -393,8 +403,6 @@ void init_generic_query_object(py::module &m) {
         }
         return obj.attrs.at(name);
     });
-
-    // join option
 }
 
 void init_object(py::module &m) {
