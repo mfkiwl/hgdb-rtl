@@ -151,6 +151,40 @@ void RTL::on_added(Ooze *) {
     db_ = std::make_unique<hgdb::rtl::DesignDatabase>(*compilation_);
 }
 
+std::shared_ptr<QueryObject> RTL::bind(const std::shared_ptr<QueryObject> &obj,
+                                       const py::object &type) {
+    // based on which type it asks for, we create a new instances
+    auto const &py_obj = py::cast(obj);
+    if (!py::hasattr(py_obj, "path")) return nullptr;
+    auto const &py_path = py_obj.attr("path");
+    auto const &path = py_path.cast<std::string>();
+    auto const &symbol = db_->select(path);
+    if (!symbol) return nullptr;
+
+    if (type.is(py::type::of<InstanceObject>())) {
+        // need to bind based on the path
+        if (!slang::InstanceSymbol::isKind(symbol->kind)) {
+            return nullptr;
+        }
+        auto const &inst = symbol->as<slang::InstanceSymbol>();
+        return std::make_shared<InstanceObject>(db_.get(), &inst);
+    } else if (type.is(py::type::of<VariableObject>())) {
+        if (!slang::VariableSymbol::isKind(symbol->kind)) {
+            return nullptr;
+        }
+        auto const &v = symbol->as<slang::VariableSymbol>();
+        return std::make_shared<VariableObject>(db_.get(), &v);
+    } else if (type.is(py::type::of<PortObject>())) {
+        if (!slang::PortSymbol::isKind(symbol->kind)) {
+            return nullptr;
+        }
+        auto const &port = symbol->as<slang::PortSymbol>();
+        return std::make_shared<PortObject>(db_.get(), &port);
+    }
+
+    return nullptr;
+}
+
 template <typename T>
 std::unique_ptr<InstanceObject> get_parent_instance(const T &obj) {
     const slang::InstanceSymbol *inst = nullptr;

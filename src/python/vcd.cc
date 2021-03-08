@@ -34,6 +34,27 @@ std::shared_ptr<QueryArray> VCD::get_selector(py::handle handle) {
     return nullptr;
 }
 
+std::shared_ptr<QueryObject> VCD::bind(const std::shared_ptr<QueryObject> &obj,
+                                       const py::object &type) {
+    // maybe binding should have extra kwargs?
+    auto py_obj = py::cast(obj);
+    if (!py::hasattr(py_obj, "path")) return nullptr;
+    auto const &py_path = py_obj.attr("path");
+    auto const &path = py_path.cast<std::string>();
+    if (db_->signals.find(path) == db_->signals.end()) {
+        return nullptr;
+    }
+    if (!type.is(py::type::of<VCDSignal>())) {
+        return nullptr;
+    }
+    auto const &signal = db_->signals.at(path);
+    auto ptr = std::make_shared<VCDSignal>();
+    ptr->signal = signal.get();
+    ptr->path = signal->path;
+    ptr->name = signal->name;
+    return ptr;
+}
+
 class VCDValue : public QueryObject {
 public:
     enum class ValueType { UInt, RawString };

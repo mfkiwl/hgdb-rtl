@@ -129,19 +129,13 @@ std::shared_ptr<QueryObject> map_object(
     }
 }
 
-class GenericQueryObject : public QueryObject {
-public:
-    GenericQueryObject() = default;
-    explicit GenericQueryObject(const std::shared_ptr<QueryObject> &obj) {
-        if (obj->is_array()) throw std::runtime_error("Cannot convert an array to generic object");
-        auto const values = obj->values();
-        for (auto const &[key, value] : values) {
-            attrs.emplace(key, value);
-        }
+GenericQueryObject::GenericQueryObject(const std::shared_ptr<QueryObject> &obj) {
+    if (obj->is_array()) throw std::runtime_error("Cannot convert an array to generic object");
+    auto const values = obj->values();
+    for (auto const &[key, value] : values) {
+        attrs.emplace(key, value);
     }
-
-    std::map<std::string, py::object> attrs;
-};
+}
 
 class GenericAttributeError : public std::runtime_error {
 public:

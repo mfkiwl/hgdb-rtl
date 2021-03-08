@@ -34,6 +34,14 @@ public:
     std::vector<std::shared_ptr<QueryObject>> data;
 };
 
+class GenericQueryObject : public QueryObject {
+public:
+    GenericQueryObject() = default;
+    explicit GenericQueryObject(const std::shared_ptr<QueryObject> &obj);
+
+    std::map<std::string, pybind11::object> attrs;
+};
+
 // helper  functions
 std::shared_ptr<QueryObject> flatten_size_one_array(const std::shared_ptr<QueryObject> &obj);
 

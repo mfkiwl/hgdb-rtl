@@ -23,6 +23,8 @@ public:
 
     std::shared_ptr<QueryArray> get_selector(py::handle handle) override;
 
+    std::shared_ptr<QueryObject> bind(const std::shared_ptr<QueryObject> &obj, const py::object &type) override;
+
 private:
     std::unique_ptr<hgdb::vcd::VCDDatabase> db_;
 };

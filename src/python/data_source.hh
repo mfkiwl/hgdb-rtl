@@ -29,6 +29,9 @@ public:
     [[nodiscard]] virtual std::shared_ptr<QueryArray> get_selector(py::handle handle) = 0;
 
     virtual void on_added(Ooze *) {}
+
+    virtual std::shared_ptr<QueryObject> bind(const std::shared_ptr<QueryObject> &obj,
+                                              const py::object &type) = 0;
 };
 
 class Ooze {
@@ -38,6 +41,7 @@ public:
 
     std::vector<std::shared_ptr<DataSource>> sources;
     struct SelectorProvider {
+        DataSource *src;
         py::handle handle;
         std::function<std::shared_ptr<QueryArray>(py::handle)> func;
     };

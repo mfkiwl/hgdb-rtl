@@ -90,6 +90,9 @@ public:
 
     inline void on_added(Ooze *) override;
 
+    std::shared_ptr<QueryObject> bind(const std::shared_ptr<QueryObject> &obj,
+                                      const py::object &type) override;
+
 private:
     std::vector<std::string> include_dirs;
     std::vector<std::string> include_sys_dirs_;
