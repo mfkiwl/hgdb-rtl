@@ -73,5 +73,17 @@ void init_data_source(py::module &m) {
                      throw std::runtime_error("Unable to find data source for type " + s);
                  }
                  return bind(src, obj, type);
-             });
+             })
+        .def_static(
+            "object",
+            [](const std::map<std::string, py::object> &values) {
+                return std::make_shared<GenericQueryObject>(values);
+            },
+            py::arg("values"))
+        .def_static(
+            "array",
+            [](const std::vector<std::shared_ptr<QueryObject>> &array) {
+                return std::make_shared<QueryArray>(array);
+            },
+            py::arg("array"));
 }

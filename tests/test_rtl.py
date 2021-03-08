@@ -48,6 +48,19 @@ def test_type_select(get_vector_file):
     assert len(result) == 7
 
 
+def test_rtl_bind(get_vector_file):
+    o = setup_source("test_variable_select.sv", get_vector_file)
+    obj = o.object({"path": "top.inst"})
+    inst = o.bind(obj, Instance)
+    assert inst.definition == "mod1"
+    obj = o.object({"path": "top.inst.d"})
+    var = o.bind(obj, Variable)
+    assert var.name == "d"
+    obj = o.object({"path": "top.inst.a"})
+    port = o.bind(obj, Port)
+    assert port.name == "a"
+
+
 def test_inside_op(get_vector_file):
     o = setup_source("test_inside_op.sv", get_vector_file)
     leaf = o.select(Instance).where(definition="mod1")
@@ -79,5 +92,5 @@ def test_port_source(get_vector_file):
 
 if __name__ == "__main__":
     from conftest import get_vector_file_fn
-    test_port_source(get_vector_file_fn)
+    test_rtl_bind(get_vector_file_fn)
 

@@ -175,11 +175,11 @@ std::shared_ptr<QueryObject> RTL::bind(const std::shared_ptr<QueryObject> &obj,
         auto const &v = symbol->as<slang::VariableSymbol>();
         return std::make_shared<VariableObject>(db_.get(), &v);
     } else if (type.is(py::type::of<PortObject>())) {
-        if (!slang::PortSymbol::isKind(symbol->kind)) {
+        auto const *port = db_->get_port(symbol);
+        if (!port) {
             return nullptr;
         }
-        auto const &port = symbol->as<slang::PortSymbol>();
-        return std::make_shared<PortObject>(db_.get(), &port);
+        return std::make_shared<PortObject>(db_.get(), port);
     }
 
     return nullptr;

@@ -16,6 +16,9 @@ public:
 
 struct QueryArray : public QueryObject {
 public:
+    QueryArray() = default;
+    explicit QueryArray(std::vector<std::shared_ptr<QueryObject>> data) : data(std::move(data)) {}
+
     std::shared_ptr<QueryObject> map(
         const std::function<std::shared_ptr<QueryObject>(QueryObject *)> &mapper) override;
 
@@ -38,6 +41,7 @@ class GenericQueryObject : public QueryObject {
 public:
     GenericQueryObject() = default;
     explicit GenericQueryObject(const std::shared_ptr<QueryObject> &obj);
+    explicit GenericQueryObject(std::map<std::string, pybind11::object> attrs);
 
     std::map<std::string, pybind11::object> attrs;
 };
