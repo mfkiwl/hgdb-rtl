@@ -1,4 +1,4 @@
-from ooze import Ooze, RTL, VCD, Port, get_value, VCDSignal
+from ooze import Ooze, RTL, VCD, Port, get_value, VCDSignal, GenericQueryObject, QueryArray
 
 
 def test_join(get_vector_file):
@@ -18,6 +18,16 @@ def test_join(get_vector_file):
     assert len(res) == 3
     a = res.where(name="a")
     assert a.value == 2
+
+
+def test_type_conversion():
+    obj = {"a": 1, "b": "2"}
+    g_o = GenericQueryObject(obj)
+    assert g_o.a == 1
+    assert g_o.b == "2"
+    array = QueryArray([g_o])
+    assert len(array) == 1
+    assert array[0] == g_o
 
 
 if __name__ == "__main__":
