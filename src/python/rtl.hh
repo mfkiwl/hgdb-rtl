@@ -32,7 +32,9 @@ public:
 
     [[nodiscard]] std::map<std::string, py::object> values() const override;
 
-    [[nodiscard]] static bool is_kind(RTLKind kind) { return kind == RTLKind::Instance; }
+    [[maybe_unused]] [[nodiscard]] static bool is_kind(RTLKind kind) {
+        return kind == RTLKind::Instance;
+    }
 };
 
 struct VariableObject : public RTLQueryObject {
@@ -44,7 +46,9 @@ public:
 
     [[nodiscard]] std::map<std::string, py::object> values() const override;
 
-    static bool is_kind(RTLKind kind) { return kind == RTLKind::Port || kind == RTLKind::Variable; }
+    [[maybe_unused]] static bool is_kind(RTLKind kind) {
+        return kind == RTLKind::Port || kind == RTLKind::Variable;
+    }
 };
 
 struct PortObject : public VariableObject {
@@ -58,7 +62,7 @@ public:
 
     [[nodiscard]] std::map<std::string, py::object> values() const override;
 
-    static bool is_kind(RTLKind kind) { return kind == RTLKind::Port; }
+    [[maybe_unused]] static bool is_kind(RTLKind kind) { return kind == RTLKind::Port; }
 };
 
 class RTL : public DataSource {
