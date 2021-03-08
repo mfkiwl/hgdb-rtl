@@ -2,13 +2,14 @@
 #define HGDB_RTL_OBJECT_HH
 
 #include "../../src/rtl.hh"
+#include "pybind11/pybind11.h"
 
 struct QueryObject {
 public:
     virtual ~QueryObject() = default;
     virtual std::shared_ptr<QueryObject> map(
         const std::function<std::shared_ptr<QueryObject>(QueryObject *)> &mapper);
-    [[nodiscard]] virtual std::map<std::string, std::string> values() const { return {}; }
+    [[nodiscard]] virtual std::map<std::string, pybind11::object> values() const { return {}; }
     [[nodiscard]] virtual bool is_array() const { return false; }
     [[nodiscard]] virtual std::string str() const { return ""; }
 };

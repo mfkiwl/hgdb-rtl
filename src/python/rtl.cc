@@ -43,24 +43,24 @@ std::shared_ptr<QueryArray> create_port_array(hgdb::rtl::DesignDatabase &db) {
     return result;
 }
 
-std::map<std::string, std::string> InstanceObject::values() const {
+std::map<std::string, py::object> InstanceObject::values() const {
     std::string path;
     instance->getHierarchicalPath(path);
-    return {{"name", std::string(instance->name)},
-            {"path", path},
-            {"definition", std::string(instance->body.name)}};
+    return {{"name", py::cast(instance->name)},
+            {"path", py::cast(path)},
+            {"definition", py::cast(instance->body.name)}};
 }
 
-std::map<std::string, std::string> VariableObject::values() const {
+std::map<std::string, py::object> VariableObject::values() const {
     std::string path;
     variable->getHierarchicalPath(path);
-    return {{"name", std::string(variable->name)}, {"path", path}};
+    return {{"name", py::cast(variable->name)}, {"path", py::cast(path)}};
 }
 
-std::map<std::string, std::string> PortObject::values() const {
+std::map<std::string, py::object> PortObject::values() const {
     std::string path;
     port->getHierarchicalPath(path);
-    return {{"name", std::string(port->name)}, {"path", path}};
+    return {{"name", py::cast(port->name)}, {"path", py::cast(path)}};
 }
 
 void RTL::compile() {

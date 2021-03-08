@@ -6,8 +6,8 @@
 
 namespace py = pybind11;
 
-std::map<std::string, std::string> VCDSignal::values() const {
-    return {{"name", name}, {"path", path}};
+std::map<std::string, py::object> VCDSignal::values() const {
+    return {{"name", py::cast(name)}, {"path", py::cast(path)}};
 }
 
 VCD::VCD(const std::string &path) : DataSource(DataSourceType::ValueChange) {
@@ -46,8 +46,8 @@ public:
     UIntValue(std::string path, uint64_t v) : VCDValue(std::move(path)), value(v) {}
     uint64_t value;
 
-    [[nodiscard]] std::map<std::string, std::string> values() const override {
-        return {{"path", path}, {"value", std::to_string(value)}};
+    [[nodiscard]] std::map<std::string, py::object> values() const override {
+        return {{"path", py::cast(path)}, {"value", py::cast(value)}};
     }
 };
 
@@ -57,8 +57,8 @@ public:
         : VCDValue(std::move(path)), value(std::move(value)) {}
 
     std::string value;
-    [[nodiscard]] std::map<std::string, std::string> values() const override {
-        return {{"path", path}, {"value", value}};
+    [[nodiscard]] std::map<std::string, py::object> values() const override {
+        return {{"path", py::cast(path)}, {"value", py::cast(value)}};
     }
 };
 

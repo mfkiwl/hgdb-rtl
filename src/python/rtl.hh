@@ -30,7 +30,7 @@ public:
     // this holds instance information
     const slang::InstanceSymbol *instance = nullptr;
 
-    [[nodiscard]] std::map<std::string, std::string> values() const override;
+    [[nodiscard]] std::map<std::string, py::object> values() const override;
 
     [[nodiscard]] static bool is_kind(RTLKind kind) { return kind == RTLKind::Instance; }
 };
@@ -42,7 +42,7 @@ public:
         : RTLQueryObject(db, variable, RTLKind::Variable), variable(variable) {}
     const slang::ValueSymbol *variable = nullptr;
 
-    [[nodiscard]] std::map<std::string, std::string> values() const override;
+    [[nodiscard]] std::map<std::string, py::object> values() const override;
 
     static bool is_kind(RTLKind kind) { return kind == RTLKind::Port || kind == RTLKind::Variable; }
 };
@@ -56,7 +56,7 @@ public:
     }
     const slang::PortSymbol *port = nullptr;
 
-    [[nodiscard]] std::map<std::string, std::string> values() const override;
+    [[nodiscard]] std::map<std::string, py::object> values() const override;
 
     static bool is_kind(RTLKind kind) { return kind == RTLKind::Port; }
 };

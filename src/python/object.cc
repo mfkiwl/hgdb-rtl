@@ -136,20 +136,11 @@ public:
         if (obj->is_array()) throw std::runtime_error("Cannot convert an array to generic object");
         auto const values = obj->values();
         for (auto const &[key, value] : values) {
-            add_attr(key, value);
+            attrs.emplace(key, value);
         }
     }
 
     std::map<std::string, py::object> attrs;
-
-    void add_attr(const std::string &key, const std::string &value) {
-        if (std::all_of(value.begin(), value.end(), isdigit)) {
-            auto v = py::cast(std::stol(value));
-            attrs.emplace(key, v);
-        } else {
-            attrs.emplace(key, py::cast(value));
-        }
-    }
 };
 
 class GenericAttributeError : public std::runtime_error {
@@ -191,7 +182,7 @@ std::shared_ptr<QueryObject> merge_object(const std::shared_ptr<QueryObject> &ob
     auto const values = obj2->values();
     for (auto const &[key, value] : values) {
         if (result->attrs.find(key) == result->attrs.end()) {
-            result->add_attr(key, value);
+            result->attrs.emplace(key, value);
         }
     }
 
@@ -291,11 +282,7 @@ void init_query_object(py::module &m) {
         py::dict dict;
         auto const values = obj.values();
         for (auto const &[name, value] : values) {
-            if (std::all_of(value.begin(), value.end(), isdigit)) {
-                dict[name.c_str()] = py::int_(std::stoul(value));
-            } else {
-                dict[name.c_str()] = value;
-            }
+            dict[name.c_str()] = value;
         }
         return py::str(dict);
     });

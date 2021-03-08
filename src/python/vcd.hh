@@ -9,7 +9,7 @@ struct VCDSignal: public QueryObject {
     std::string name;
     hgdb::vcd::VCDSignal *signal;
 
-    [[nodiscard]] std::map<std::string, std::string> values() const override;
+    [[nodiscard]] std::map<std::string, pybind11::object> values() const override;
 };
 
 
