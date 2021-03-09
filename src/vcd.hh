@@ -50,6 +50,13 @@ private:
     void de_alias_signal(std::unordered_map<std::string, uint64_t> &vcd_count,
                          std::unordered_map<std::string, std::string> &identifier_mapping,
                          std::unordered_map<std::string, VCDSignal *> &identifier_signal_mapping);
+    std::string find_identifier(std::unordered_map<std::string, std::string> &identifier_mapping,
+                                const VCDValue &value);
+    static std::unordered_set<std::string> identify_signals(
+        std::unordered_map<std::string, uint64_t> &vcd_count,
+        std::unordered_map<std::string, std::string> &identifier_mapping);
+    std::map<uint64_t, std::string> create_new_values(uint64_t count,
+                                                      const std::basic_string<char> &identifier);
 };
 
 }  // namespace hgdb::vcd

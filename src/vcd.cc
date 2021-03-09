@@ -95,26 +95,9 @@ void VCDDatabase::alias_signal(
     std::unordered_map<std::string, VCDSignal *> &identifier_signal_mapping,
     const VCDValue &value) {
     // need to figure out whether the signals should be aliased
-    std::string identifier = value.identifier;
-    if (identifier_mapping.empty()) {
-        // map to itself
-        identifier_mapping.emplace(identifier, identifier);
-    } else if (identifier_mapping.find(identifier) != identifier_mapping.end()) {
-        // we have found an alias mapping
-        identifier = identifier_mapping.at(identifier);
-    } else {
-        // this is a new one. we just randomly pick up an identifier
-        // that has the same value
-        for (auto const &[id, vs] : values) {
-            if (vs.size() == 1 && vs.find(value.time) != vs.end() &&
-                vs.at(value.time) == value.value) {
-                identifier = id;
-                break;
-            }
-        }
-        // can't find any, randomly pick one
-        if (identifier.empty()) identifier = identifier_mapping.begin()->second;
-    }
+    // this is best-effort as we will resolve it later
+    std::string identifier = find_identifier(identifier_mapping, value);
+
     auto &values_ = values[identifier];
     auto *sig = identifier_signal_mapping.at(value.identifier);
     sig->raw_values = &values_;
@@ -156,35 +139,44 @@ void VCDDatabase::alias_signal(
     identifier_mapping[value.identifier] = value.identifier;
 }
 
+std::string VCDDatabase::find_identifier(
+    std::unordered_map<std::string, std::string> &identifier_mapping, const VCDValue &value) {
+    std::string identifier = value.identifier;
+    if (identifier_mapping.empty()) {
+        // map to itself
+        identifier_mapping.emplace(identifier, identifier);
+    } else if (identifier_mapping.find(identifier) != identifier_mapping.end()) {
+        // we have found an alias mapping
+        identifier = identifier_mapping.at(identifier);
+    } else {
+        // this is a new one. we just randomly pick up an identifier
+        // that has the same value
+        for (auto const &[id, vs] : values) {
+            if (vs.size() == 1 && vs.find(value.time) != vs.end() &&
+                vs.at(value.time) == value.value) {
+                identifier = id;
+                break;
+            }
+        }
+        // can't find any, randomly pick one
+        if (identifier.empty()) identifier = identifier_mapping.begin()->second;
+    }
+    return identifier;
+}
+
 void VCDDatabase::de_alias_signal(
     std::unordered_map<std::string, uint64_t> &vcd_count,
     std::unordered_map<std::string, std::string> &identifier_mapping,
     std::unordered_map<std::string, VCDSignal *> &identifier_signal_mapping) {
     // we need to detect if we should de-alias some signals
-    std::unordered_set<std::string> changes;
-    for (auto const &[from, to] : identifier_mapping) {
-        if (from != to) {
-            auto from_count = vcd_count.at(from);
-            auto to_count = vcd_count.at(to);
-            if (from_count != to_count) {
-                // need to de-alias these two signals
-                changes.emplace(from);
-            }
-        }
-    }
+    std::unordered_set<std::string> changes = identify_signals(vcd_count, identifier_mapping);
 
     for (auto const &identifier : changes) {
         // if there is an signal that matches out signal values
         // we should alias to that instead
         auto count = vcd_count.at(identifier);
         auto old_identifier = identifier_mapping.at(identifier);
-        auto iter = values.at(old_identifier).begin();
-        std::map<uint64_t, std::string> new_values;
-        // notice that map (B-tree) is ordered nicely
-        for (uint64_t i = 0; i < count; i++) {
-            new_values.emplace(iter->first, iter->second);
-            iter++;
-        }
+        std::map<uint64_t, std::string> new_values = create_new_values(count, old_identifier);
 
         bool match = true;
         std::string match_id;
@@ -218,6 +210,35 @@ void VCDDatabase::de_alias_signal(
             }
         }
     }
+}
+
+std::map<uint64_t, std::string> VCDDatabase::create_new_values(
+    uint64_t count, const std::basic_string<char> &identifier) {
+    auto iter = values.at(identifier).begin();
+    std::map<uint64_t, std::string> new_values;
+    // notice that map (B-tree) is ordered nicely
+    for (uint64_t i = 0; i < count; i++) {
+        new_values.emplace(iter->first, iter->second);
+        iter++;
+    }
+    return new_values;
+}
+
+std::unordered_set<std::string> VCDDatabase::identify_signals(
+    std::unordered_map<std::string, uint64_t> &vcd_count,
+    std::unordered_map<std::string, std::string> &identifier_mapping) {
+    std::unordered_set<std::string> changes;
+    for (auto const &[from, to] : identifier_mapping) {
+        if (from != to) {
+            auto from_count = vcd_count.at(from);
+            auto to_count = vcd_count.at(to);
+            if (from_count != to_count) {
+                // need to de-alias these two signals
+                changes.emplace(from);
+            }
+        }
+    }
+    return changes;
 }
 
 std::map<std::string, uint64_t> VCDDatabase::get_stats() const {
