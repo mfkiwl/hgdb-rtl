@@ -13,9 +13,9 @@ struct RTLQueryObject : public QueryObject {
 public:
     enum class RTLKind { Instance, Variable, Port };
     RTLQueryObject() = delete;
-    explicit RTLQueryObject(hgdb::rtl::DesignDatabase *db, const slang::Symbol *symbol,
+    explicit RTLQueryObject(Ooze *ooze_, hgdb::rtl::DesignDatabase *db, const slang::Symbol *symbol,
                             RTLKind kind)
-        : db(db), symbol(symbol), kind(kind) {}
+        : QueryObject(ooze_), db(db), symbol(symbol), kind(kind) {}
     hgdb::rtl::DesignDatabase *db;
 
     const slang::Symbol *symbol;
@@ -25,8 +25,9 @@ public:
 struct InstanceObject : public RTLQueryObject {
 public:
     InstanceObject() = delete;
-    InstanceObject(hgdb::rtl::DesignDatabase *db, const slang::InstanceSymbol *instance)
-        : RTLQueryObject(db, instance, RTLKind::Instance), instance(instance) {}
+    InstanceObject(Ooze *ooze_, hgdb::rtl::DesignDatabase *db,
+                   const slang::InstanceSymbol *instance)
+        : RTLQueryObject(ooze_, db, instance, RTLKind::Instance), instance(instance) {}
     // this holds instance information
     const slang::InstanceSymbol *instance = nullptr;
 
@@ -40,8 +41,8 @@ public:
 struct VariableObject : public RTLQueryObject {
 public:
     VariableObject() = delete;
-    VariableObject(hgdb::rtl::DesignDatabase *db, const slang::ValueSymbol *variable)
-        : RTLQueryObject(db, variable, RTLKind::Variable), variable(variable) {}
+    VariableObject(Ooze *ooze_, hgdb::rtl::DesignDatabase *db, const slang::ValueSymbol *variable)
+        : RTLQueryObject(ooze_, db, variable, RTLKind::Variable), variable(variable) {}
     const slang::ValueSymbol *variable = nullptr;
 
     [[nodiscard]] std::map<std::string, py::object> values() const override;
@@ -54,8 +55,8 @@ public:
 struct PortObject : public VariableObject {
 public:
     PortObject() = delete;
-    PortObject(hgdb::rtl::DesignDatabase *db, const slang::PortSymbol *port)
-        : VariableObject(db, port), port(port) {
+    PortObject(Ooze *ooze_, hgdb::rtl::DesignDatabase *db, const slang::PortSymbol *port)
+        : VariableObject(ooze_, db, port), port(port) {
         kind = RTLKind::Port;
     }
     const slang::PortSymbol *port = nullptr;
@@ -88,7 +89,7 @@ public:
 
     std::shared_ptr<QueryArray> get_selector(py::handle handle) override;
 
-    inline void on_added(Ooze *) override;
+    inline void on_added(Ooze * ooze) override;
 
     std::shared_ptr<QueryObject> bind(const std::shared_ptr<QueryObject> &obj,
                                       const py::object &type) override;
@@ -104,6 +105,8 @@ private:
     std::unique_ptr<slang::Compilation> compilation_;
     std::unique_ptr<hgdb::rtl::DesignDatabase> db_;
     std::unique_ptr<slang::SourceManager> source_manager_;
+
+    Ooze *ooze_ = nullptr;
 };
 
 #endif  // HGDB_RTL_PYTHON_RTL_HH

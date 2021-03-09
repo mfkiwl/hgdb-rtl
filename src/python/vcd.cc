@@ -4,20 +4,20 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <utility>
+
 namespace py = pybind11;
 
 std::map<std::string, py::object> VCDSignal::values() const {
     return {{"name", py::cast(name)}, {"path", py::cast(path)}};
 }
 
-VCD::VCD(const std::string &path) : DataSource(DataSourceType::ValueChange) {
-    db_ = std::make_unique<hgdb::vcd::VCDDatabase>(path);
-}
+VCD::VCD(std::string path) : DataSource(DataSourceType::ValueChange), filename_(std::move(path)) {}
 
-std::shared_ptr<QueryArray> create_signal_array(const hgdb::vcd::VCDDatabase &db) {
-    auto result = std::make_shared<QueryArray>();
+std::shared_ptr<QueryArray> create_signal_array(Ooze *ooze, const hgdb::vcd::VCDDatabase &db) {
+    auto result = std::make_shared<QueryArray>(ooze);
     for (auto const &[id, signal] : db.signals) {
-        auto s = std::make_shared<VCDSignal>();
+        auto s = std::make_shared<VCDSignal>(ooze);
         s->name = signal->name;
         s->path = signal->path;
         s->signal = signal.get();
@@ -29,7 +29,7 @@ std::shared_ptr<QueryArray> create_signal_array(const hgdb::vcd::VCDDatabase &db
 std::shared_ptr<QueryArray> VCD::get_selector(py::handle handle) {
     if (handle.is(py::type::of<VCDSignal>())) {
         // create instance selector
-        return create_signal_array(*db_);
+        return create_signal_array(ooze_, *db_);
     }
     return nullptr;
 }
@@ -48,19 +48,26 @@ std::shared_ptr<QueryObject> VCD::bind(const std::shared_ptr<QueryObject> &obj,
         return nullptr;
     }
     auto const &signal = db_->signals.at(path);
-    auto ptr = std::make_shared<VCDSignal>();
+    auto ptr = std::make_shared<VCDSignal>(ooze_);
     ptr->signal = signal.get();
     ptr->path = signal->path;
     ptr->name = signal->name;
     return ptr;
 }
 
+void VCD::on_added(Ooze *ooze) {
+    ooze_ = ooze;
+    parse();
+}
+
+void VCD::parse() { db_ = std::make_unique<hgdb::vcd::VCDDatabase>(filename_); }
+
 class VCDValue : public QueryObject {
 public:
     enum class ValueType { UInt, RawString };
-    explicit VCDValue(ValueType type, std::string path, uint64_t time,
+    explicit VCDValue(Ooze *ooze, ValueType type, std::string path, uint64_t time,
                       const hgdb::vcd::VCDSignal *signal)
-        : type(type), path(std::move(path)), time(time), signal(signal) {}
+        : QueryObject(ooze), type(type), path(std::move(path)), time(time), signal(signal) {}
     ValueType type;
     std::string path;
     uint64_t time;
@@ -71,8 +78,9 @@ public:
 // we define UInt and str wrapper for VCD values
 class UIntValue : public VCDValue {
 public:
-    UIntValue(std::string path, uint64_t v, uint64_t time, const hgdb::vcd::VCDSignal *signal)
-        : VCDValue(ValueType::UInt, std::move(path), time, signal), value(v) {}
+    UIntValue(Ooze *ooze, std::string path, uint64_t v, uint64_t time,
+              const hgdb::vcd::VCDSignal *signal)
+        : VCDValue(ooze, ValueType::UInt, std::move(path), time, signal), value(v) {}
     uint64_t value;
 
     [[nodiscard]] std::map<std::string, py::object> values() const override {
@@ -82,9 +90,10 @@ public:
 
 class StringValue : public VCDValue {
 public:
-    StringValue(std::string path, std::string value, uint64_t time,
+    StringValue(Ooze *ooze, std::string path, std::string value, uint64_t time,
                 const hgdb::vcd::VCDSignal *signal)
-        : VCDValue(ValueType::RawString, std::move(path), time, signal), value(std::move(value)) {}
+        : VCDValue(ooze, ValueType::RawString, std::move(path), time, signal),
+          value(std::move(value)) {}
 
     std::string value;
     [[nodiscard]] std::map<std::string, py::object> values() const override {
@@ -98,10 +107,10 @@ std::function<std::shared_ptr<VCDValue>(const std::shared_ptr<VCDSignal> &)> get
         std::shared_ptr<VCDValue> ptr;
         if (use_str) {
             auto v = s->signal->get_value(time);
-            ptr = std::make_shared<StringValue>(s->path, v, time, s->signal);
+            ptr = std::make_shared<StringValue>(s->ooze, s->path, v, time, s->signal);
         } else {
             auto v = s->signal->get_uint_value(time);
-            ptr = std::make_shared<UIntValue>(s->path, v, time, s->signal);
+            ptr = std::make_shared<UIntValue>(s->ooze, s->path, v, time, s->signal);
         }
         return ptr;
     };
@@ -121,11 +130,11 @@ std::shared_ptr<VCDValue> pre_value(const std::shared_ptr<VCDValue> &value) {
         switch (value->type) {
             case VCDValue::ValueType::RawString: {
                 auto v = value->signal->get_value(t);
-                return std::make_shared<StringValue>(value->path, v, t, value->signal);
+                return std::make_shared<StringValue>(value->ooze, value->path, v, t, value->signal);
             }
             case VCDValue::ValueType::UInt: {
                 auto v = value->signal->get_uint_value(t);
-                return std::make_shared<UIntValue>(value->path, v, t, value->signal);
+                return std::make_shared<UIntValue>(value->ooze, value->path, v, t, value->signal);
             }
             default: {
                 return nullptr;

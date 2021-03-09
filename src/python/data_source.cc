@@ -19,7 +19,7 @@ std::shared_ptr<QueryObject> bind(DataSource *src, const std::shared_ptr<QueryOb
                                   const py::object &type) {
     // depends on if the object is an array or not
     if (obj->is_array()) {
-        auto result = std::make_shared<QueryArray>();
+        auto result = std::make_shared<QueryArray>(obj->ooze);
         auto const &array = std::reinterpret_pointer_cast<QueryArray>(obj);
         for (auto const &entry : array->data) {
             auto r = bind(src, entry, type);
@@ -42,7 +42,7 @@ void init_data_source(py::module &m) {
         .def("add_source", &Ooze::add_source, py::arg("data_source"))
         .def("select",
              [](Ooze *ooze, const py::args &types) -> std::shared_ptr<QueryObject> {
-                 auto query_array = std::make_shared<QueryArray>();
+                 auto query_array = std::make_shared<QueryArray>(ooze);
                  // need to find registered types
                  for (auto const &t : types) {
                      for (auto const &provider : ooze->selector_providers) {
@@ -74,25 +74,27 @@ void init_data_source(py::module &m) {
                  }
                  return bind(src, obj, type);
              })
-        .def("provider",
-             [](const Ooze &ooze, const py::object &type) -> DataSource * {
-                 for (auto const &provider : ooze.selector_providers) {
-                     if (provider.handle.is(type)) {
-                         return provider.src;
-                     }
-                 }
-                 return nullptr;
-             }, py::return_value_policy::reference_internal)
-        .def_static(
+        .def(
+            "provider",
+            [](const Ooze &ooze, const py::object &type) -> DataSource * {
+                for (auto const &provider : ooze.selector_providers) {
+                    if (provider.handle.is(type)) {
+                        return provider.src;
+                    }
+                }
+                return nullptr;
+            },
+            py::return_value_policy::reference_internal)
+        .def(
             "object",
-            [](const std::map<std::string, py::object> &values) {
-                return std::make_shared<GenericQueryObject>(values);
+            [](Ooze &ooze, const std::map<std::string, py::object> &values) {
+                return std::make_shared<GenericQueryObject>(&ooze, values);
             },
             py::arg("values"))
-        .def_static(
+        .def(
             "array",
-            [](const std::vector<std::shared_ptr<QueryObject>> &array) {
-                return std::make_shared<QueryArray>(array);
+            [](Ooze &ooze, const std::vector<std::shared_ptr<QueryObject>> &array) {
+                return std::make_shared<QueryArray>(&ooze, array);
             },
             py::arg("array"));
 }

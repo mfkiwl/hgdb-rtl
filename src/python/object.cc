@@ -5,6 +5,7 @@
 #include <pybind11/stl.h>
 
 #include <sstream>
+#include <utility>
 
 #include "query.hh"
 
@@ -15,9 +16,12 @@ std::shared_ptr<QueryObject> QueryObject::map(
     return mapper(this);
 }
 
+QueryArray::QueryArray(Ooze *ooze, std::vector<std::shared_ptr<QueryObject>> array)
+    : QueryObject(ooze), data(std::move(array)) {}
+
 std::shared_ptr<QueryObject> QueryArray::map(
     const std::function<std::shared_ptr<QueryObject>(QueryObject *)> &mapper) {
-    auto result = std::make_shared<QueryArray>();
+    auto result = std::make_shared<QueryArray>(ooze);
     auto len = size();
     for (uint64_t i = 0; i < len; i++) {
         auto obj = get(i);
@@ -85,7 +89,7 @@ std::shared_ptr<QueryObject> select_type(const std::shared_ptr<QueryObject> &obj
     }
 
     auto array = std::reinterpret_pointer_cast<QueryArray>(obj);
-    auto result = std::make_shared<QueryArray>();
+    auto result = std::make_shared<QueryArray>(obj->ooze);
     for (auto const &entry : array->data) {
         auto py_obj = py::cast(entry);
         if (entry->is_array()) {
@@ -115,7 +119,7 @@ std::shared_ptr<QueryObject> map_object(
     const std::function<std::shared_ptr<QueryObject>(const std::shared_ptr<QueryObject> &)> &func) {
     if (obj->is_array()) {
         auto const &array = std::reinterpret_pointer_cast<QueryArray>(obj);
-        auto result = std::make_shared<QueryArray>();
+        auto result = std::make_shared<QueryArray>(obj->ooze);
         for (auto const &entry : array->data) {
             auto o = map_object(entry, func);
             if (o) {
@@ -129,7 +133,8 @@ std::shared_ptr<QueryObject> map_object(
     }
 }
 
-GenericQueryObject::GenericQueryObject(const std::shared_ptr<QueryObject> &obj) {
+GenericQueryObject::GenericQueryObject(const std::shared_ptr<QueryObject> &obj)
+    : QueryObject(obj->ooze) {
     if (obj->is_array()) throw std::runtime_error("Cannot convert an array to generic object");
     auto const values = obj->values();
     for (auto const &[key, value] : values) {
@@ -137,8 +142,8 @@ GenericQueryObject::GenericQueryObject(const std::shared_ptr<QueryObject> &obj) 
     }
 }
 
-GenericQueryObject::GenericQueryObject(std::map<std::string, pybind11::object> attrs)
-    : attrs(std::move(attrs)) {}
+GenericQueryObject::GenericQueryObject(Ooze *ooze, std::map<std::string, pybind11::object> attrs)
+    : QueryObject(ooze), attrs(std::move(attrs)) {}
 
 class GenericAttributeError : public std::runtime_error {
 public:
@@ -189,19 +194,19 @@ std::shared_ptr<QueryObject> merge_object(const std::shared_ptr<QueryObject> &ob
 std::shared_ptr<QueryObject> join_object(const std::shared_ptr<QueryObject> &obj1,
                                          const std::shared_ptr<QueryObject> &obj2,
                                          const std::vector<std::string> &join_keys) {
-    auto result = std::make_shared<QueryArray>();
+    auto result = std::make_shared<QueryArray>(obj1->ooze);
     std::shared_ptr<QueryArray> array1, array2;
     // we turn two objects into arrays
     if (obj1->is_array()) {
         array1 = std::reinterpret_pointer_cast<QueryArray>(obj1);
     } else {
-        array1 = std::make_shared<QueryArray>();
+        array1 = std::make_shared<QueryArray>(obj1->ooze);
         array1->add(obj1);
     }
     if (obj2->is_array()) {
         array2 = std::reinterpret_pointer_cast<QueryArray>(obj2);
     } else {
-        array2 = std::make_shared<QueryArray>();
+        array2 = std::make_shared<QueryArray>(obj1->ooze);
         array2->add(obj2);
     }
 
@@ -243,7 +248,7 @@ std::shared_ptr<QueryObject> query_object_select(const std::shared_ptr<QueryObje
     }
     if (obj->is_array()) {
         auto array = std::reinterpret_pointer_cast<QueryArray>(obj);
-        auto r = std::make_shared<QueryArray>();
+        auto r = std::make_shared<QueryArray>(obj->ooze);
         for (auto const &entry : array->data) {
             auto selected = query_object_select(entry, args);
             r->add(selected);
@@ -252,7 +257,7 @@ std::shared_ptr<QueryObject> query_object_select(const std::shared_ptr<QueryObje
     } else {
         // based on whether it is an array or not
         // create a generic object based on each arg select
-        auto r = std::make_shared<GenericQueryObject>();
+        auto r = std::make_shared<GenericQueryObject>(obj->ooze);
         auto py_obj = py::cast(obj);
         auto res = py::cast(r);
         for (auto const &arg : args) {
@@ -351,9 +356,6 @@ void init_query_array(py::module &m) {
         }
         return py::str(list);
     });
-
-    // we also take a list of query objects and make it into a query array
-    array.def(py::init<std::vector<std::shared_ptr<QueryObject>>>(), py::arg("values"));
 }
 
 void init_generic_query_object(py::module &m) {
@@ -371,8 +373,6 @@ void init_generic_query_object(py::module &m) {
         }
         return py::str(dict);
     });
-    // we allow a generic query object to be constructed from dict
-    obj.def(py::init<std::map<std::string, py::object>>(), py::arg("attributes"));
 
     // we translate our custom attribute error to standard attribute error
     py::register_exception<GenericAttributeError>(m, "GenericAttributeError", PyExc_AttributeError);

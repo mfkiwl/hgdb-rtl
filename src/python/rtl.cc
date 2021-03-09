@@ -13,32 +13,32 @@
 
 namespace py = pybind11;
 
-std::shared_ptr<QueryArray> create_instance_array(hgdb::rtl::DesignDatabase &db) {
-    auto result = std::make_shared<QueryArray>();
+std::shared_ptr<QueryArray> create_instance_array(Ooze *ooze, hgdb::rtl::DesignDatabase &db) {
+    auto result = std::make_shared<QueryArray>(ooze);
     auto const &instances = db.instances();
     result->data.reserve(instances.size());
     for (auto const *inst : instances) {
-        result->data.emplace_back(std::make_shared<InstanceObject>(&db, inst));
+        result->data.emplace_back(std::make_shared<InstanceObject>(ooze, &db, inst));
     }
     return result;
 }
 
-std::shared_ptr<QueryArray> create_variable_array(hgdb::rtl::DesignDatabase &db) {
-    auto result = std::make_shared<QueryArray>();
+std::shared_ptr<QueryArray> create_variable_array(Ooze *ooze, hgdb::rtl::DesignDatabase &db) {
+    auto result = std::make_shared<QueryArray>(ooze);
     auto const &variables = db.variables();
     result->data.reserve(variables.size());
     for (auto const *v : variables) {
-        result->data.emplace_back(std::make_shared<VariableObject>(&db, v));
+        result->data.emplace_back(std::make_shared<VariableObject>(ooze, &db, v));
     }
     return result;
 }
 
-std::shared_ptr<QueryArray> create_port_array(hgdb::rtl::DesignDatabase &db) {
-    auto result = std::make_shared<QueryArray>();
+std::shared_ptr<QueryArray> create_port_array(Ooze *ooze, hgdb::rtl::DesignDatabase &db) {
+    auto result = std::make_shared<QueryArray>(ooze);
     auto const &ports = db.ports();
     result->data.reserve(ports.size());
     for (auto const *p : ports) {
-        result->data.emplace_back(std::make_shared<PortObject>(&db, p));
+        result->data.emplace_back(std::make_shared<PortObject>(ooze, &db, p));
     }
     return result;
 }
@@ -137,18 +137,19 @@ std::shared_ptr<QueryArray> RTL::get_selector(py::handle handle) {
     // based on what type it is
     if (handle.is(py::type::of<InstanceObject>())) {
         // create instance selector
-        return create_instance_array(*db_);
+        return create_instance_array(ooze_, *db_);
     } else if (handle.is(py::type::of<VariableObject>())) {
-        return create_variable_array(*db_);
+        return create_variable_array(ooze_, *db_);
     } else if (handle.is(py::type::of<PortObject>())) {
-        return create_port_array(*db_);
+        return create_port_array(ooze_, *db_);
     }
     return nullptr;
 }
 
-void RTL::on_added(Ooze *) {
+void RTL::on_added(Ooze *ooze) {
     compile();
     db_ = std::make_unique<hgdb::rtl::DesignDatabase>(*compilation_);
+    ooze_ = ooze;
 }
 
 std::shared_ptr<QueryObject> RTL::bind(const std::shared_ptr<QueryObject> &obj,
@@ -167,26 +168,26 @@ std::shared_ptr<QueryObject> RTL::bind(const std::shared_ptr<QueryObject> &obj,
             return nullptr;
         }
         auto const &inst = symbol->as<slang::InstanceSymbol>();
-        return std::make_shared<InstanceObject>(db_.get(), &inst);
+        return std::make_shared<InstanceObject>(ooze_, db_.get(), &inst);
     } else if (type.is(py::type::of<VariableObject>())) {
         if (!slang::VariableSymbol::isKind(symbol->kind)) {
             return nullptr;
         }
         auto const &v = symbol->as<slang::VariableSymbol>();
-        return std::make_shared<VariableObject>(db_.get(), &v);
+        return std::make_shared<VariableObject>(ooze_, db_.get(), &v);
     } else if (type.is(py::type::of<PortObject>())) {
         auto const *port = db_->get_port(symbol);
         if (!port) {
             return nullptr;
         }
-        return std::make_shared<PortObject>(db_.get(), port);
+        return std::make_shared<PortObject>(ooze_, db_.get(), port);
     }
 
     return nullptr;
 }
 
 template <typename T>
-std::unique_ptr<InstanceObject> get_parent_instance(const T &obj) {
+std::unique_ptr<InstanceObject> get_parent_instance(Ooze *ooze, const T &obj) {
     const slang::InstanceSymbol *inst = nullptr;
     if constexpr (std::is_base_of<slang::ValueSymbol, T>::value) {
         inst = obj.db->get_parent_instance(obj.variable);
@@ -196,7 +197,7 @@ std::unique_ptr<InstanceObject> get_parent_instance(const T &obj) {
     }
 
     if (!inst) return nullptr;
-    auto ptr = std::make_unique<InstanceObject>(obj.db, inst);
+    auto ptr = std::make_unique<InstanceObject>(ooze, obj.db, inst);
     return ptr;
 }
 
@@ -208,8 +209,8 @@ void init_instance_object(py::module &m) {
         .def_property_readonly(
             "definition",
             [](const std::shared_ptr<InstanceObject> &obj) { return obj->instance->body.name; })
-        .def_property_readonly("parent",
-                               [](const InstanceObject &obj) { return get_parent_instance(obj); });
+        .def_property_readonly(
+            "parent", [](const InstanceObject &obj) { return get_parent_instance(obj.ooze, obj); });
 }
 
 void init_variable_object(py::module &m) {
@@ -218,11 +219,11 @@ void init_variable_object(py::module &m) {
     cls.def_property_readonly("name", [](const VariableObject &obj) { return obj.variable->name; })
         .def_property_readonly("instance",
                                [](const VariableObject &obj) -> std::unique_ptr<InstanceObject> {
-                                   return get_parent_instance(obj);
+                                   return get_parent_instance(obj.ooze, obj);
                                })
         .def_property_readonly("parent",
                                [](const VariableObject &obj) -> std::unique_ptr<InstanceObject> {
-                                   return get_parent_instance(obj);
+                                   return get_parent_instance(obj.ooze, obj);
                                });
 }
 
@@ -281,7 +282,7 @@ bool inside_instance(const std::shared_ptr<RTLQueryObject> &obj,
 std::shared_ptr<QueryObject> get_source(const std::shared_ptr<QueryObject> &target) {
     if (target->is_array()) {
         auto const &array = std::reinterpret_pointer_cast<QueryArray>(target);
-        auto result = std::make_shared<QueryArray>();
+        auto result = std::make_shared<QueryArray>(target->ooze);
         for (auto const &entry : array->data) {
             auto mapped = get_source(entry);
             if (mapped) {
@@ -302,11 +303,11 @@ std::shared_ptr<QueryObject> get_source(const std::shared_ptr<QueryObject> &targ
             return nullptr;
         } else if (sources.size() == 1) {
             auto const *inst = *sources.begin();
-            return std::make_shared<InstanceObject>(rtl_obj->db, inst);
+            return std::make_shared<InstanceObject>(target->ooze, rtl_obj->db, inst);
         } else {
-            auto result = std::make_shared<QueryArray>();
+            auto result = std::make_shared<QueryArray>(target->ooze);
             for (auto const *inst : sources) {
-                return std::make_shared<InstanceObject>(rtl_obj->db, inst);
+                return std::make_shared<InstanceObject>(target->ooze, rtl_obj->db, inst);
             }
             return result;
         }

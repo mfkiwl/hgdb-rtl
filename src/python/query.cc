@@ -10,7 +10,7 @@ namespace py = pybind11;
 
 std::shared_ptr<QueryObject> Filter::apply(const std::shared_ptr<QueryObject> &data) {
     // first need to see if data is an array or not
-    auto result = std::make_shared<QueryArray>();
+    auto result = std::make_shared<QueryArray>(data->ooze);
 
     if (data->is_array()) {
         auto array = std::reinterpret_pointer_cast<QueryArray>(data);

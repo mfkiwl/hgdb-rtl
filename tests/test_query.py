@@ -21,11 +21,12 @@ def test_join(get_vector_file):
 
 
 def test_type_conversion():
+    o = Ooze()
     obj = {"a": 1, "b": "2"}
-    g_o = GenericQueryObject(obj)
+    g_o = o.object(obj)
     assert g_o.a == 1
     assert g_o.b == "2"
-    array = QueryArray([g_o])
+    array = o.array([g_o])
     assert len(array) == 1
     assert array[0] == g_o
 

@@ -4,20 +4,25 @@
 #include "../../src/rtl.hh"
 #include "pybind11/pybind11.h"
 
+class Ooze;
+
 struct QueryObject {
 public:
+    explicit QueryObject(Ooze *ooze) : ooze(ooze) {}
+
     virtual ~QueryObject() = default;
     virtual std::shared_ptr<QueryObject> map(
         const std::function<std::shared_ptr<QueryObject>(QueryObject *)> &mapper);
     [[nodiscard]] virtual std::map<std::string, pybind11::object> values() const { return {}; }
     [[nodiscard]] virtual bool is_array() const { return false; }
     [[nodiscard]] virtual std::string str() const { return ""; }
+    Ooze *ooze;
 };
 
 struct QueryArray : public QueryObject {
 public:
-    QueryArray() = default;
-    explicit QueryArray(std::vector<std::shared_ptr<QueryObject>> data) : data(std::move(data)) {}
+    explicit QueryArray(Ooze *ooze_): QueryObject(ooze_) {}
+    QueryArray(Ooze *ooze, std::vector<std::shared_ptr<QueryObject>> array);
 
     std::shared_ptr<QueryObject> map(
         const std::function<std::shared_ptr<QueryObject>(QueryObject *)> &mapper) override;
@@ -39,9 +44,9 @@ public:
 
 class GenericQueryObject : public QueryObject {
 public:
-    GenericQueryObject() = default;
+    explicit GenericQueryObject(Ooze *ooze_): QueryObject(ooze_) {}
     explicit GenericQueryObject(const std::shared_ptr<QueryObject> &obj);
-    explicit GenericQueryObject(std::map<std::string, pybind11::object> attrs);
+    explicit GenericQueryObject(Ooze *ooze, std::map<std::string, pybind11::object> attrs);
 
     std::map<std::string, pybind11::object> attrs;
 };

@@ -5,9 +5,10 @@
 #include "data_source.hh"
 
 struct VCDSignal: public QueryObject {
+    explicit VCDSignal(Ooze *ooze): QueryObject(ooze) {}
     std::string path;
     std::string name;
-    hgdb::vcd::VCDSignal *signal;
+    hgdb::vcd::VCDSignal *signal = nullptr;
 
     [[nodiscard]] std::map<std::string, pybind11::object> values() const override;
 };
@@ -15,7 +16,7 @@ struct VCDSignal: public QueryObject {
 
 class VCD: public DataSource {
 public:
-    explicit VCD(const std::string &path);
+    explicit VCD(std::string path);
 
     [[nodiscard]] inline std::vector<py::handle> provides() const override {
         return {py::type::of<VCDSignal>()};
@@ -27,8 +28,13 @@ public:
 
     [[nodiscard]] auto get_stats() const { return db_->get_stats(); }
 
+    void on_added(Ooze *ooze) override;
+
 private:
     std::unique_ptr<hgdb::vcd::VCDDatabase> db_;
+    std::string filename_;
+    Ooze *ooze_ = nullptr;
+    void parse();
 };
 
 #endif  // HGDB_RTL_PYTHON_VCD_HH

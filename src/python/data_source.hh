@@ -32,6 +32,8 @@ public:
 
     virtual std::shared_ptr<QueryObject> bind(const std::shared_ptr<QueryObject> &obj,
                                               const py::object &type) = 0;
+
+    [[nodiscard]] virtual std::set<py::object> filter_values() const { return {}; }
 };
 
 class Ooze {
