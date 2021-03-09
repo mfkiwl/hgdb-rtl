@@ -196,7 +196,9 @@ void init_vcd(py::module &m) {
 
     auto uint = py::class_<UIntValue, VCDValue, std::shared_ptr<UIntValue>>(m, "UIntValue");
     uint.def("__int__", [](const UIntValue &v) { return v.value; });
+    uint.def_property_readonly("value", [](const UIntValue &v) { return v.value; });
 
     auto str = py::class_<StringValue, VCDValue, std::shared_ptr<StringValue>>(m, "StringValue");
     str.def("__str__", [](const StringValue &s) { return s.value; });
+    str.def_property_readonly("value", [](const StringValue &v) { return v.value; });
 }

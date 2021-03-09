@@ -45,6 +45,13 @@ def test_vcd_bind(get_vector_file):
     assert res.time == 20
 
 
+def test_vcd_when(get_vector_file):
+    o = setup_vcd(get_vector_file, "test_vcd.vcd")
+    a = o.select(VCDSignal).where(path="top.a")
+    res = a.when(lambda v: v.value > 2).select("time")
+    assert res[0].time == 20
+
+
 if __name__ == "__main__":
     from conftest import get_vector_file_fn
-    test_vcd_aliasing(get_vector_file_fn)
+    test_vcd_when(get_vector_file_fn)

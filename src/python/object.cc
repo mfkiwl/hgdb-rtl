@@ -282,7 +282,7 @@ std::shared_ptr<QueryObject> object_when(
     auto result = std::make_shared<QueryArray>(obj->ooze);
     DataSource *data_source = nullptr;
     for (auto const &provider : ooze->selector_providers) {
-        if (provider.handle.is(py::type(py_obj))) {
+        if (provider.handle.is(py_obj.get_type())) {
             data_source = provider.src;
             break;
         }
