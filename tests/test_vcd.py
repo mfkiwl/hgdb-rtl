@@ -14,8 +14,16 @@ def test_vcd_read(get_vector_file):
     res = o.select(VCDSignal)
     assert len(res) == 3 * 2
     value = get_value(10)
-    res = res.map(value)
-    assert int(res[1]) == 2
+    res = res.map(value).where(path="top.a")
+    assert int(res) == 2
+
+
+def test_vcd_aliasing(get_vector_file):
+    o = setup_vcd(get_vector_file, "test_vcd.vcd")
+    vcd = o.provider(VCDSignal)
+    stats = vcd.stats
+    # all variables from dut should be aliased into the mod
+    assert stats["num_aliased"] == 3
 
 
 def test_vcd_pre_value(get_vector_file):
@@ -39,4 +47,4 @@ def test_vcd_bind(get_vector_file):
 
 if __name__ == "__main__":
     from conftest import get_vector_file_fn
-    test_vcd_bind(get_vector_file_fn)
+    test_vcd_aliasing(get_vector_file_fn)

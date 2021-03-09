@@ -25,6 +25,8 @@ public:
 
     std::shared_ptr<QueryObject> bind(const std::shared_ptr<QueryObject> &obj, const py::object &type) override;
 
+    [[nodiscard]] auto get_stats() const { return db_->get_stats(); }
+
 private:
     std::unique_ptr<hgdb::vcd::VCDDatabase> db_;
 };

@@ -143,6 +143,7 @@ void init_vcd(py::module &m) {
 
     auto source = py::class_<VCD, DataSource, std::shared_ptr<VCD>>(m, "VCD");
     source.def(py::init<const std::string>(), py::arg("filename"));
+    source.def_property_readonly("stats", [](const VCD &vcd) { return vcd.get_stats(); });
 
     m.def("get_value", &get_value, py::arg("time"), py::arg("use_str"));
     m.def(

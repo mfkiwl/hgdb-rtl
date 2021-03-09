@@ -1,10 +1,10 @@
 #ifndef HGDB_RTL_VCD_HH
 #define HGDB_RTL_VCD_HH
 
-#include <vcd/vcd.hh>
 #include <map>
 #include <memory>
 #include <set>
+#include <vcd/vcd.hh>
 
 namespace hgdb::vcd {
 
@@ -27,7 +27,6 @@ public:
     VCDDatabase *db;
 };
 
-
 class VCDDatabase {
 public:
     explicit VCDDatabase(const std::string &filename);
@@ -40,8 +39,19 @@ public:
     std::set<uint64_t> times;
     // hold the actual values
     std::unordered_map<std::string, std::map<uint64_t, std::string>> values;
+
+    std::map<std::string, uint64_t> get_stats() const;
+
+private:
+    void alias_signal(std::unordered_map<std::string, std::string> &identifier_mapping,
+                      std::unordered_set<std::string> &seen_identifiers,
+                      std::unordered_map<std::string, VCDSignal *> &identifier_signal_mapping,
+                      const VCDValue &value);
+    void de_alias_signal(std::unordered_map<std::string, uint64_t> &vcd_count,
+                         std::unordered_map<std::string, std::string> &identifier_mapping,
+                         std::unordered_map<std::string, VCDSignal *> &identifier_signal_mapping);
 };
 
-}
+}  // namespace hgdb::vcd
 
 #endif  // HGDB_RTL_VCD_HH

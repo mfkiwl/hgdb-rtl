@@ -74,6 +74,15 @@ void init_data_source(py::module &m) {
                  }
                  return bind(src, obj, type);
              })
+        .def("provider",
+             [](const Ooze &ooze, const py::object &type) -> DataSource * {
+                 for (auto const &provider : ooze.selector_providers) {
+                     if (provider.handle.is(type)) {
+                         return provider.src;
+                     }
+                 }
+                 return nullptr;
+             }, py::return_value_policy::reference_internal)
         .def_static(
             "object",
             [](const std::map<std::string, py::object> &values) {
