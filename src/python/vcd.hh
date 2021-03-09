@@ -30,6 +30,8 @@ public:
 
     void on_added(Ooze *ooze) override;
 
+    std::unique_ptr<FilterMapperGenerator> filter_generator() const override;
+
 private:
     std::unique_ptr<hgdb::vcd::VCDDatabase> db_;
     std::string filename_;

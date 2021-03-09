@@ -118,6 +118,37 @@ std::function<std::shared_ptr<VCDValue>(const std::shared_ptr<VCDSignal> &)> get
     return func;
 }
 
+class VCDTimeGenerator : public FilterMapperGenerator {
+public:
+    explicit VCDTimeGenerator(const std::set<uint64_t> &times) : times_(times), it(times.begin()) {}
+
+    std::optional<std::function<std::shared_ptr<QueryObject>(QueryObject *)>> next() override {
+        if (it == times_.end()) {
+            return std::nullopt;
+        } else {
+            auto t = *it;
+            it++;
+            auto value = get_value(t);
+            auto func = [value](QueryObject *obj) -> std::shared_ptr<QueryObject> {
+                auto ptr = obj->shared_from_this();
+                auto v = std::dynamic_pointer_cast<VCDSignal>(ptr);
+                if (!v) return nullptr;
+                auto r = value(v);
+                return r;
+            };
+            return func;
+        }
+    }
+
+private:
+    const std::set<uint64_t> &times_;
+    std::set<uint64_t>::const_iterator it;
+};
+
+std::unique_ptr<FilterMapperGenerator> VCD::filter_generator() const {
+    return std::make_unique<VCDTimeGenerator>(db_->times);
+}
+
 std::shared_ptr<VCDValue> pre_value(const std::shared_ptr<VCDValue> &value) {
     auto *db = value->signal->db;
     auto time = value->time;

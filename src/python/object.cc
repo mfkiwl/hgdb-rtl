@@ -7,6 +7,7 @@
 #include <sstream>
 #include <utility>
 
+#include "data_source.hh"
 #include "query.hh"
 
 namespace py = pybind11;
@@ -272,6 +273,36 @@ std::shared_ptr<QueryObject> query_object_select(const std::shared_ptr<QueryObje
     }
 }
 
+std::shared_ptr<QueryObject> object_when(
+    const std::shared_ptr<QueryObject> &obj,
+    const std::function<bool(const std::shared_ptr<QueryObject> &)> &func) {
+    // find out the provider of that type
+    Ooze *ooze = obj->ooze;
+    auto const &py_obj = py::cast(obj);
+    auto result = std::make_shared<QueryArray>(obj->ooze);
+    DataSource *data_source = nullptr;
+    for (auto const &provider : ooze->selector_providers) {
+        if (provider.handle.is(py::type(py_obj))) {
+            data_source = provider.src;
+            break;
+        }
+    }
+    if (!data_source) return nullptr;
+    auto generator = data_source->filter_generator();
+    if (!generator) return nullptr;
+    while (true) {
+        auto f = generator->next();
+        if (!f) break;
+        auto mapper = *f;
+        auto o = obj->map(mapper);
+        auto b = func(o);
+        if (b) {
+            result->add(o);
+        }
+    }
+    return flatten_size_one_array(result);
+}
+
 void init_query_object(py::module &m) {
     auto obj = py::class_<QueryObject, std::shared_ptr<QueryObject>>(m, "QueryObject");
     obj.def("map", &QueryObject::map);
@@ -331,6 +362,9 @@ void init_query_object(py::module &m) {
             return join_object(obj, other, join_keys);
         },
         py::arg("other"));
+
+    // when, which needs help from the data source providers
+    obj.def("when", &object_when, py::arg("predicate"));
 }
 
 void init_query_array(py::module &m) {

@@ -13,11 +13,20 @@
 #include "slang/syntax/SyntaxTree.h"
 #include "slang/text/SourceManager.h"
 
+#include <optional>
+
 namespace py = pybind11;
 
 enum class DataSourceType { RTL, Mapping, ValueChange, Log };
 
 class Ooze;
+
+class FilterMapperGenerator {
+public:
+    // used to generator mappers for filtering
+    virtual std::optional<std::function<std::shared_ptr<QueryObject>(QueryObject *)>>
+    next() = 0;
+};
 
 class DataSource {
 public:
@@ -33,7 +42,10 @@ public:
     virtual std::shared_ptr<QueryObject> bind(const std::shared_ptr<QueryObject> &obj,
                                               const py::object &type) = 0;
 
-    [[nodiscard]] virtual std::set<py::object> filter_values() const { return {}; }
+    // used when user call when
+    [[nodiscard]] virtual std::unique_ptr<FilterMapperGenerator> filter_generator() const {
+        return nullptr;
+    }
 };
 
 class Ooze {

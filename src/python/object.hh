@@ -6,7 +6,7 @@
 
 class Ooze;
 
-struct QueryObject {
+struct QueryObject: public std::enable_shared_from_this<QueryObject> {
 public:
     explicit QueryObject(Ooze *ooze) : ooze(ooze) {}
 
