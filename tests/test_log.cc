@@ -1,5 +1,4 @@
 #include <iostream>
-#include <sstream>
 
 #include "../src/log.hh"
 #include "fmt/format.h"
@@ -35,7 +34,8 @@ private:
 
 TEST(log, test_parsing) {  // NOLINT
     std::stringstream ss;
-    for (auto i = 0; i < 3000; i++) {
+    constexpr auto num_items = 3000;
+    for (auto i = 0; i < num_items; i++) {
         ss << i << std::endl;
     }
     hgdb::log::LogDatabase db;
@@ -52,5 +52,12 @@ TEST(log, test_parsing) {  // NOLINT
     for (auto &item: items) ptr_items.emplace_back(&item);
     batch->get_items(ptr_items);
     EXPECT_EQ(ptr_items.size(), 1024);
-    // TODO add more test assertions
+    EXPECT_EQ(ptr_items[42]->time, 42);
+    EXPECT_EQ(ptr_items[42]->str_values[0], "42");
+    EXPECT_EQ(ptr_items[42]->float_values[1], 42 * 1.5);
+
+    batches = db.get_batch(2500);
+    EXPECT_EQ(batches.size(), 1);
+    batch = batches[0];
+    EXPECT_EQ(batch->size(), num_items % 1024);
 }

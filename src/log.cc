@@ -96,6 +96,7 @@ void LogItemBatch::get_items(const std::vector<LogItem *> &items) const {
 
     std::vector data = raw_data_;
 
+    auto times = deserialize<uint64_t>(data, pos);
     auto int_values = deserialize<int64_t>(data, pos);
     auto float_values = deserialize<double>(data, pos);
     auto str_values = deserialize<std::string>(data, pos);
@@ -121,6 +122,7 @@ void LogItemBatch::get_items(const std::vector<LogItem *> &items) const {
     }
     uint64_t int_pos = 0, float_pos = 0, str_pos = 0;
     for (uint64_t i = 0; i < size_; i++) {
+        items[i]->time = times[i];
         items[i]->int_values =
             std::vector(int_values.begin() + int_pos, int_values.begin() + int_pos + int_size);
         items[i]->float_values = std::vector(float_values.begin() + float_pos,
@@ -147,6 +149,11 @@ std::unique_ptr<LogItemBatch> compress(const LogPrintfParser::Format &format,
     std::vector<char> uncompressed_data;
     // we do column storage
     constexpr uint64_t entry_per_item = 2;
+
+    std::vector<uint64_t> times;
+    times.reserve(items.size());
+    for (auto const &item : items) times.emplace_back(item.time);
+    serialize(uncompressed_data, times);
 
     std::vector<int64_t> int_values;
     int_values.reserve(items.size() * entry_per_item);
