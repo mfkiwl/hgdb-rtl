@@ -7,7 +7,7 @@ function(add_warning_flags TARGET_NAME)
 endfunction()
 
 
-add_library(hgdb-rtl rtl.cc vcd.cc)
+add_library(hgdb-rtl rtl.cc vcd.cc log.cc)
 target_link_libraries(hgdb-rtl PRIVATE slangcompiler vcd)
 target_include_directories(hgdb-rtl PUBLIC ../extern/slang/include
         ../extern/slang/external/
