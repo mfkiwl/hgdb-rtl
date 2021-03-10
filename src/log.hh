@@ -82,7 +82,7 @@ public:
     void add_file(const std::string &filename);
     void add_file(std::istream &stream);
     void parse(LogFormatParser &parser);
-    [[nodiscard]] std::vector<LogItemBatch*> get_batch(uint64_t time) const;
+    [[nodiscard]] std::vector<LogItemBatch *> get_batch(uint64_t time) const;
 
 private:
     uint64_t batch_size_ = 1024;

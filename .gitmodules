@@ -10,3 +10,6 @@
 [submodule "extern/vcd"]
 	path = extern/vcd
 	url = https://github.com/Kuree/vcd
+[submodule "extern/lz"]
+	path = extern/lz
+	url = https://github.com/Kuree/lz

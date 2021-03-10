@@ -8,11 +8,12 @@ endfunction()
 
 
 add_library(hgdb-rtl rtl.cc vcd.cc log.cc)
-target_link_libraries(hgdb-rtl PRIVATE slangcompiler vcd)
+target_link_libraries(hgdb-rtl PRIVATE slangcompiler vcd lz)
 target_include_directories(hgdb-rtl PUBLIC ../extern/slang/include
         ../extern/slang/external/
         ${CMAKE_CURRENT_BINARY_DIR}/../extern/slang/source
-        ../extern/vcd/include)
+        ../extern/vcd/include
+        ../extern/lz/include)
 
 add_warning_flags(hgdb-rtl)
 

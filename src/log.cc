@@ -2,7 +2,11 @@
 
 #include <type_traits>
 
+#include "lz/lz.hh"
+
 namespace hgdb::log {
+
+constexpr int compression_level = 0;
 
 LogFile::LogFile(const std::string &filename) : path(filename) {
     fstream = std::ifstream(filename);
@@ -94,7 +98,7 @@ void LogItemBatch::get_items(const std::vector<LogItem *> &items) const {
     // we first decompress each column
     uint64_t pos = 0;
 
-    std::vector data = raw_data_;
+    std::vector data = lz::decompress(raw_data_);
 
     auto times = deserialize<uint64_t>(data, pos);
     auto int_values = deserialize<int64_t>(data, pos);
@@ -173,7 +177,9 @@ std::unique_ptr<LogItemBatch> compress(const LogPrintfParser::Format &format,
         str_values.insert(str_values.end(), item.str_values.begin(), item.str_values.end());
     serialize(uncompressed_data, str_values);
 
-    auto ptr = std::make_unique<LogItemBatch>(items.size(), uncompressed_data, format);
+    auto compressed_data = lz::compress(uncompressed_data, compression_level);
+
+    auto ptr = std::make_unique<LogItemBatch>(items.size(), compressed_data, format);
     items.clear();
     return ptr;
 }
