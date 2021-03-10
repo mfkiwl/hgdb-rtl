@@ -13,8 +13,10 @@ namespace hgdb::log {
 class LogFile {
 public:
     explicit LogFile(const std::string &filename);
+    explicit LogFile(std::istream &s) : stream(&s) {}
 
-    std::ifstream stream;
+    std::istream *stream;
+    std::ifstream fstream;
     std::string path;
 
     ~LogFile();
@@ -52,7 +54,7 @@ public:
     LogItemBatch(uint64_t size, std::vector<char> raw_data, const LogFormatParser::Format &format)
         : size_(size), raw_data_(std::move(raw_data)), format_(format) {}
 
-    void get_item(uint64_t index, LogItem &item);
+    void get_items(const std::vector<LogItem *> &items);
 
 private:
     uint64_t size_;
@@ -80,7 +82,7 @@ public:
 private:
     uint64_t batch_size_ = 1024;
     std::vector<std::unique_ptr<LogItemBatch>> batches_;
-    std::map<uint64_t, std::vector<uint64_t>> item_index_;
+    std::map<uint64_t, std::set<uint64_t>> item_index_;
     std::vector<std::unique_ptr<LogFile>> log_files_;
     LogFormatParser::Format format_;
 };
