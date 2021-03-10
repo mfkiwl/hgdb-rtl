@@ -26,8 +26,9 @@ public:
 // structures. Notice that log items are directly instantiated from the io locations
 class LogItem {
 public:
+    LogItem() = default;
     explicit LogItem(uint64_t time) : time(time) {}
-    uint64_t time;
+    uint64_t time = 0;
 
     // pointing to the log file
     LogFile *file = nullptr;
@@ -45,7 +46,7 @@ public:
     enum class ValueType { Int, Str, Float };
     using Format = std::map<std::string, std::pair<ValueType, uint64_t>>;
     [[nodiscard]] virtual Format format() const = 0;
-    [[nodiscard]] virtual LogItem parse(const std::string &content) const = 0;
+    [[nodiscard]] virtual LogItem parse(const std::string &content) = 0;
 };
 
 // a batch of log items
@@ -54,7 +55,9 @@ public:
     LogItemBatch(uint64_t size, std::vector<char> raw_data, const LogFormatParser::Format &format)
         : size_(size), raw_data_(std::move(raw_data)), format_(format) {}
 
-    void get_items(const std::vector<LogItem *> &items);
+    void get_items(const std::vector<LogItem *> &items) const;
+
+    [[nodiscard]] uint64_t size() const { return size_; }
 
 private:
     uint64_t size_;
@@ -66,7 +69,7 @@ class LogPrintfParser : public LogFormatParser {
 public:
     LogPrintfParser(const std::string &format, const std::vector<std::string> &attr_names);
 
-    LogItem parse(const std::string &content) const override;
+    LogItem parse(const std::string &content) override;
 
     std::map<std::string, std::pair<ValueType, uint64_t>> format() const override;
 };
@@ -77,7 +80,9 @@ public:
     explicit LogDatabase(uint64_t batch_size) : batch_size_(batch_size) {}
 
     void add_file(const std::string &filename);
-    void parse(const LogPrintfParser &parser);
+    void add_file(std::istream &stream);
+    void parse(LogFormatParser &parser);
+    [[nodiscard]] std::vector<LogItemBatch*> get_batch(uint64_t time) const;
 
 private:
     uint64_t batch_size_ = 1024;

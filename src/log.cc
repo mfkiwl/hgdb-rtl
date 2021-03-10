@@ -22,6 +22,10 @@ void LogDatabase::add_file(const std::string &filename) {
     log_files_.emplace_back(std::make_unique<LogFile>(filename));
 }
 
+void LogDatabase::add_file(std::istream &stream) {
+    log_files_.emplace_back(std::make_unique<LogFile>(stream));
+}
+
 template <typename T>
 void write_data(std::vector<char> &data, uint64_t &pos, T v) {
     auto const *raw_value = reinterpret_cast<char *>(&v);
@@ -86,7 +90,7 @@ std::vector<T> deserialize(const std::vector<char> &data, uint64_t &pos) {
     return result;
 }
 
-void LogItemBatch::get_items(const std::vector<LogItem *> &items) {
+void LogItemBatch::get_items(const std::vector<LogItem *> &items) const {
     // we first decompress each column
     uint64_t pos = 0;
 
@@ -163,10 +167,11 @@ std::unique_ptr<LogItemBatch> compress(const LogPrintfParser::Format &format,
     serialize(uncompressed_data, str_values);
 
     auto ptr = std::make_unique<LogItemBatch>(items.size(), uncompressed_data, format);
+    items.clear();
     return ptr;
 }
 
-void LogDatabase::parse(const LogPrintfParser &parser) {
+void LogDatabase::parse(LogFormatParser &parser) {
     std::vector<LogItem> batch;
     batch.reserve(batch_size_);
     format_ = parser.format();
@@ -190,6 +195,18 @@ void LogDatabase::parse(const LogPrintfParser &parser) {
     }
     auto p = compress(format_, batch, item_index_, batches_.size());
     if (p) batches_.emplace_back(std::move(p));
+}
+
+std::vector<LogItemBatch *> LogDatabase::get_batch(uint64_t time) const {
+    if (item_index_.find(time) == item_index_.end()) return {};
+    std::vector<LogItemBatch *> result;
+    auto const &values = item_index_.at(time);
+    result.reserve(values.size());
+    for (auto const idx : values) {
+        result.emplace_back(batches_[idx].get());
+    }
+
+    return result;
 }
 
 }  // namespace hgdb::log

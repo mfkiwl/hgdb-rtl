@@ -16,4 +16,4 @@ function(add_test target)
 endfunction()
 
 add_test(test_rtl)
-
+add_test(test_log)
