@@ -35,7 +35,8 @@ LogPrintfParser::LogPrintfParser(const std::string &format,
                                  const std::vector<std::string> &attr_names)
     : time_index_(std::numeric_limits<uint64_t>::max()) {
     parse_format(format);
-    if (types_.size() != (attr_names.size() + 1) || time_index_ == std::numeric_limits<uint64_t>::max()) {
+    if (types_.size() != (attr_names.size() + 1) ||
+        time_index_ == std::numeric_limits<uint64_t>::max()) {
         error_ = true;
         return;
     }
@@ -67,8 +68,7 @@ LogPrintfParser::LogPrintfParser(const std::string &format,
                 i--;
             }
         }
-        if (add_format)
-            format_.emplace(name, std::make_pair(type, index));
+        if (add_format) format_.emplace(name, std::make_pair(type, index));
     }
 }
 
@@ -292,12 +292,13 @@ void LogItemBatch::get_items(const std::vector<LogItem *> &items) const {
 
 std::unique_ptr<LogItemBatch> compress(const LogPrintfParser::Format &format,
                                        std::vector<LogItem> &items,
-                                       std::map<uint64_t, std::set<uint64_t>> &item_index_,
+                                       std::vector<std::shared_ptr<LogIndex>> &item_index_,
                                        uint64_t batch_idx) {
     // we perform column based storage
     if (items.empty()) return nullptr;
-    for (auto const &item : items) {
-        item_index_[item.time].emplace(batch_idx);
+    for (uint64_t i = 0; i < items.size(); i++) {
+        auto entry = std::make_shared<LogIndex>(batch_idx, i);
+        item_index_.emplace_back(entry);
     }
     // need to construct data array
     std::vector<char> uncompressed_data;
@@ -360,16 +361,21 @@ void LogDatabase::parse(LogFormatParser &parser) {
     if (p) batches_.emplace_back(std::move(p));
 }
 
-std::vector<LogItemBatch *> LogDatabase::get_batch(uint64_t time) const {
-    if (item_index_.find(time) == item_index_.end()) return {};
-    std::vector<LogItemBatch *> result;
-    auto const &values = item_index_.at(time);
-    result.reserve(values.size());
-    for (auto const idx : values) {
-        result.emplace_back(batches_[idx].get());
+void LogDatabase::get_item(LogItem *item, const LogIndex &index) {
+    if (cached_index_ && *cached_index_ == index.batch_index) {
+        // use cached index
+        *item = cached_items_[index.index];
+    } else {
+        // need to decode it
+        auto &batch = batches_[index.batch_index];
+        cached_index_ = index.batch_index;
+        cached_items_.resize(batch->size());
+        std::vector<LogItem *> items;
+        items.resize(batch->size());
+        for (uint64_t i = 0; i < items.size(); i++) items[i] = &cached_items_[i];
+        batch->get_items(items);
+        *item = cached_items_[index.index];
     }
-
-    return result;
 }
 
 }  // namespace hgdb::log

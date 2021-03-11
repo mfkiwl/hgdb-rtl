@@ -42,24 +42,11 @@ TEST(log, test_parsing) {  // NOLINT
     db.add_file(ss);
     DummyParser parser;
     db.parse(parser);
-    auto batches = db.get_batch(0);
-    EXPECT_EQ(batches.size(), 1);
-    auto const *batch = batches[0];
-    std::vector<hgdb::log::LogItem> items;
-    items.resize(batch->size());
-    std::vector<hgdb::log::LogItem *> ptr_items;
-    ptr_items.reserve(items.size());
-    for (auto &item : items) ptr_items.emplace_back(&item);
-    batch->get_items(ptr_items);
-    EXPECT_EQ(ptr_items.size(), 1024);
-    EXPECT_EQ(ptr_items[42]->time, 42);
-    EXPECT_EQ(ptr_items[42]->str_values[0], "42");
-    EXPECT_EQ(ptr_items[42]->float_values[1], 42 * 1.5);
-
-    batches = db.get_batch(2500);
-    EXPECT_EQ(batches.size(), 1);
-    batch = batches[0];
-    EXPECT_EQ(batch->size(), num_items % 1024);
+    hgdb::log::LogItem item;
+    db.get_item(&item, hgdb::log::LogIndex{0, 42});
+    EXPECT_EQ(item.time, 42);
+    EXPECT_EQ(item.str_values[0], "42");
+    EXPECT_EQ(item.float_values[1], 42 * 1.5);
 }
 
 TEST(log, test_printf) {  // NOLINT
@@ -72,20 +59,11 @@ TEST(log, test_printf) {  // NOLINT
     db.add_file(ss);
     auto parser = hgdb::log::LogPrintfParser("@%t PROC: %0d 0x%08X %m", {"proc", "value", "inst"});
     db.parse(parser);
-    auto batches = db.get_batch(1);
-    EXPECT_EQ(batches.size(), 1);
-    auto const &batch = batches[0];
 
-    std::vector<hgdb::log::LogItem> items;
-    items.resize(batch->size());
-    std::vector<hgdb::log::LogItem *> ptr_items;
-    ptr_items.reserve(items.size());
-    for (auto &item : items) ptr_items.emplace_back(&item);
-    batch->get_items(ptr_items);
-
-    EXPECT_EQ(ptr_items.size(), 1024);
-    EXPECT_EQ(ptr_items[42]->time, 42 + 1);
-    EXPECT_EQ(ptr_items[42]->int_values[0], 42);
-    EXPECT_EQ(ptr_items[42]->int_values[1], 44);
-    EXPECT_EQ(ptr_items[42]->str_values[0], "aa.bb.cc");
+    hgdb::log::LogItem item;
+    db.get_item(&item, hgdb::log::LogIndex{0, 42});
+    EXPECT_EQ(item.time, 42 + 1);
+    EXPECT_EQ(item.int_values[0], 42);
+    EXPECT_EQ(item.int_values[1], 44);
+    EXPECT_EQ(item.str_values[0], "aa.bb.cc");
 }

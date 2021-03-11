@@ -4,10 +4,10 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <regex>
 #include <set>
 #include <string>
 #include <vector>
-#include <regex>
 
 namespace hgdb::log {
 
@@ -84,6 +84,13 @@ private:
     std::vector<ValueType> types_;
 };
 
+struct LogIndex {
+public:
+    LogIndex(uint64_t batch_index, uint64_t index) : batch_index(batch_index), index(index) {}
+    uint64_t batch_index;
+    uint64_t index;
+};
+
 class LogDatabase {
 public:
     LogDatabase() = default;
@@ -92,14 +99,22 @@ public:
     void add_file(const std::string &filename);
     void add_file(std::istream &stream);
     void parse(LogFormatParser &parser);
-    [[nodiscard]] std::vector<LogItemBatch *> get_batch(uint64_t time) const;
+    [[nodiscard]] const std::vector<std::shared_ptr<LogIndex>> &item_index() const {
+        return item_index_;
+    }
+
+    void get_item(LogItem *item, const LogIndex &index);
 
 private:
     uint64_t batch_size_ = 1024;
     std::vector<std::unique_ptr<LogItemBatch>> batches_;
-    std::map<uint64_t, std::set<uint64_t>> item_index_;
+    std::vector<std::shared_ptr<LogIndex>> item_index_;
     std::vector<std::unique_ptr<LogFile>> log_files_;
     LogFormatParser::Format format_;
+
+    // we cache one decoded batch
+    std::optional<uint64_t> cached_index_;
+    std::vector<LogItem> cached_items_;
 };
 
 }  // namespace hgdb::log
