@@ -35,16 +35,18 @@ LogPrintfParser::LogPrintfParser(const std::string &format,
                                  const std::vector<std::string> &attr_names)
     : time_index_(std::numeric_limits<uint64_t>::max()) {
     parse_format(format);
-    if (types_.size() != attr_names.size() || time_index_ == std::numeric_limits<uint64_t>::max()) {
+    if (types_.size() != (attr_names.size() + 1) || time_index_ == std::numeric_limits<uint64_t>::max()) {
         error_ = true;
         return;
     }
     // set up the format
     uint64_t int_values = 0, float_values = 0, str_values = 0;
+    uint64_t type_idx = 0;
     for (uint64_t i = 0; i < attr_names.size(); i++) {
-        auto type = types_[i];
+        auto type = types_[type_idx++];
         auto const &name = attr_names[i];
         uint64_t index;
+        bool add_format = true;
         switch (type) {
             case ValueType::Int:
             case ValueType::Hex: {
@@ -61,10 +63,12 @@ LogPrintfParser::LogPrintfParser(const std::string &format,
             }
             default: {
                 // we don't record about time
-                continue;
+                add_format = false;
+                i--;
             }
         }
-        format_.emplace(name, std::make_pair(type, index));
+        if (add_format)
+            format_.emplace(name, std::make_pair(type, index));
     }
 }
 
@@ -152,7 +156,7 @@ LogItem LogPrintfParser::parse(const std::string &content) {
                     break;
                 }
                 case ValueType::Hex: {
-                    auto value = std::stol(match.str(), 0, 16);
+                    auto value = std::stol(match.str(), nullptr, 16);
                     log.int_values.emplace_back(value);
                     break;
                 }
