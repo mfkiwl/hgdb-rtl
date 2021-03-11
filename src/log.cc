@@ -1,5 +1,6 @@
 #include "log.hh"
 
+#include <limits>
 #include <type_traits>
 
 #include "lz/lz.hh"
@@ -28,6 +29,146 @@ void LogDatabase::add_file(const std::string &filename) {
 
 void LogDatabase::add_file(std::istream &stream) {
     log_files_.emplace_back(std::make_unique<LogFile>(stream));
+}
+
+LogPrintfParser::LogPrintfParser(const std::string &format,
+                                 const std::vector<std::string> &attr_names)
+    : time_index_(std::numeric_limits<uint64_t>::max()) {
+    parse_format(format);
+    if (types_.size() != attr_names.size() || time_index_ == std::numeric_limits<uint64_t>::max()) {
+        error_ = true;
+        return;
+    }
+    // set up the format
+    uint64_t int_values = 0, float_values = 0, str_values = 0;
+    for (uint64_t i = 0; i < attr_names.size(); i++) {
+        auto type = types_[i];
+        auto const &name = attr_names[i];
+        uint64_t index;
+        switch (type) {
+            case ValueType::Int:
+            case ValueType::Hex: {
+                index = int_values++;
+                break;
+            }
+            case ValueType::Float: {
+                index = float_values++;
+                break;
+            }
+            case ValueType::Str: {
+                index = str_values++;
+                break;
+            }
+            default: {
+                // we don't record about time
+                continue;
+            }
+        }
+        format_.emplace(name, std::make_pair(type, index));
+    }
+}
+
+void LogPrintfParser::parse_format(const std::string &format) {
+    // we are interested in any $display related formatting
+    // hand-rolled FSM-based parser
+    int state = 0;
+    std::string regex_data;
+    regex_data.reserve(format.size() * 2);
+
+    for (auto c : format) {
+        if (state == 0) {
+            if (c == '\\') {
+                // escape mode
+                state = 2;
+            } else if (c == '%') {
+                state = 1;
+            } else {
+                regex_data.append(std::string(1, c));
+            }
+        } else if (state == 1) {
+            if (isdigit(c)) {
+                continue;
+            } else if (c == 'd') {
+                // put number regex here
+                types_.emplace_back(ValueType::Int);
+                regex_data.append(R"(\s?(\d+))");
+            } else if (c == 't') {
+                types_.emplace_back(ValueType::Time);
+                regex_data.append(R"(\s?(\d+))");
+                time_index_ = types_.size();
+            } else if (c == 'x' || c == 'X') {
+                types_.emplace_back(ValueType::Hex);
+                regex_data.append(R"(\s?([\da-fA-F]+))");
+            } else if (c == 's') {
+                types_.emplace_back(ValueType::Str);
+                regex_data.append(R"((\w+))");
+            } else if (c == 'm') {
+                types_.emplace_back(ValueType::Str);
+                regex_data.append(R"(([\w$_\d.]+))");
+            } else if (c == 'f') {
+                types_.emplace_back(ValueType::Float);
+                regex_data.append(R"(([+-]?([0-9]*[.])?[0-9]+))");
+            } else {
+                throw std::runtime_error("Unknown formatter " + std::string(1, c));
+            }
+            state = 0;
+        } else {
+            if (c == '%') {
+                // no need to escape this at all
+                regex_data.append(std::string(1, c));
+            } else {
+                regex_data.append(std::string(1, '\\'));
+                regex_data.append(std::string(1, c));
+            }
+            state = 0;
+        }
+    }
+    // set the regex
+    re_ = std::regex(regex_data);
+}
+
+LogItem LogPrintfParser::parse(const std::string &content) {
+    auto log = LogItem();
+    if (has_error()) {
+        return log;
+    }
+    std::smatch matches;
+
+    if (std::regex_search(content, matches, re_)) {
+        for (auto i = 1u; i < matches.size(); i++) {
+            // need to convert the types
+            auto idx = i - 1;
+            auto type = types_[idx];
+            auto const &match = matches[i];
+            switch (type) {
+                case ValueType::Int: {
+                    auto value = std::stol(match.str());
+                    log.int_values.emplace_back(value);
+                    break;
+                }
+                case ValueType::Time: {
+                    auto value = std::stol(match.str());
+                    log.time = value;
+                    break;
+                }
+                case ValueType::Hex: {
+                    auto value = std::stol(match.str(), 0, 16);
+                    log.int_values.emplace_back(value);
+                    break;
+                }
+                case ValueType::Float: {
+                    auto value = std::stof(match.str());
+                    log.float_values.emplace_back(value);
+                    break;
+                }
+                case ValueType::Str: {
+                    log.str_values.emplace_back(match.str());
+                    break;
+                }
+            }
+        }
+    }
+    return log;
 }
 
 template <typename T>
@@ -110,6 +251,7 @@ void LogItemBatch::get_items(const std::vector<LogItem *> &items) const {
     for (auto const &[name, entry] : format_) {
         auto [t, idx] = entry;
         switch (t) {
+            case LogFormatParser::ValueType::Hex:
             case LogFormatParser::ValueType::Int: {
                 int_size++;
                 break;
@@ -120,6 +262,10 @@ void LogItemBatch::get_items(const std::vector<LogItem *> &items) const {
             }
             case LogFormatParser::ValueType::Str: {
                 str_size++;
+                break;
+            }
+            case LogFormatParser::ValueType::Time: {
+                // don't care
                 break;
             }
         }

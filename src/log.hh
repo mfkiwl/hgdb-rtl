@@ -7,6 +7,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <regex>
 
 namespace hgdb::log {
 
@@ -43,7 +44,7 @@ public:
 
 class LogFormatParser {
 public:
-    enum class ValueType { Int, Str, Float };
+    enum class ValueType { Int, Hex, Str, Float, Time };
     using Format = std::map<std::string, std::pair<ValueType, uint64_t>>;
     [[nodiscard]] virtual Format format() const = 0;
     [[nodiscard]] virtual LogItem parse(const std::string &content) = 0;
@@ -71,7 +72,16 @@ public:
 
     LogItem parse(const std::string &content) override;
 
-    std::map<std::string, std::pair<ValueType, uint64_t>> format() const override;
+    LogFormatParser::Format format() const override { return format_; }
+    [[nodiscard]] bool has_error() const { return error_; }
+
+private:
+    void parse_format(const std::string &format);
+    LogFormatParser::Format format_;
+    std::regex re_;
+    bool error_ = false;
+    uint64_t time_index_;
+    std::vector<ValueType> types_;
 };
 
 class LogDatabase {
