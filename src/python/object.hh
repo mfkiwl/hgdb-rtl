@@ -6,7 +6,7 @@
 
 class Ooze;
 
-struct QueryObject: public std::enable_shared_from_this<QueryObject> {
+struct QueryObject : public std::enable_shared_from_this<QueryObject> {
 public:
     explicit QueryObject(Ooze *ooze) : ooze(ooze) {}
 
@@ -21,7 +21,7 @@ public:
 
 struct QueryArray : public QueryObject {
 public:
-    explicit QueryArray(Ooze *ooze_): QueryObject(ooze_) {}
+    explicit QueryArray(Ooze *ooze_) : QueryObject(ooze_) {}
     QueryArray(Ooze *ooze, std::vector<std::shared_ptr<QueryObject>> array);
 
     std::shared_ptr<QueryObject> map(
@@ -44,11 +44,17 @@ public:
 
 class GenericQueryObject : public QueryObject {
 public:
-    explicit GenericQueryObject(Ooze *ooze_): QueryObject(ooze_) {}
+    explicit GenericQueryObject(Ooze *ooze_) : QueryObject(ooze_) {}
     explicit GenericQueryObject(const std::shared_ptr<QueryObject> &obj);
     explicit GenericQueryObject(Ooze *ooze, std::map<std::string, pybind11::object> attrs);
 
     std::map<std::string, pybind11::object> attrs;
+};
+
+class GenericAttributeError : public std::runtime_error {
+public:
+    explicit GenericAttributeError(const std::string &str)
+        : std::runtime_error("Object has no attribute '" + str + "'") {}
 };
 
 // helper  functions

@@ -146,11 +146,6 @@ GenericQueryObject::GenericQueryObject(const std::shared_ptr<QueryObject> &obj)
 GenericQueryObject::GenericQueryObject(Ooze *ooze, std::map<std::string, pybind11::object> attrs)
     : QueryObject(ooze), attrs(std::move(attrs)) {}
 
-class GenericAttributeError : public std::runtime_error {
-public:
-    explicit GenericAttributeError(const std::string &str) : std::runtime_error(str) {}
-};
-
 void compute_hash_keys(const std::vector<std::string> &join_keys,
                        const std::shared_ptr<QueryArray> &array,
                        std::map<uint64_t, std::vector<std::shared_ptr<QueryObject>>> &hash_map) {
@@ -421,8 +416,7 @@ void init_generic_query_object(py::module &m) {
     obj.def("__getattr__", [](const GenericQueryObject &obj, const std::string &name) {
         if (obj.attrs.find(name) == obj.attrs.end()) {
             // this will throw an error
-            std::string error = "Object has no attribute '" + name + "'";
-            throw GenericAttributeError(error);
+            throw GenericAttributeError(name);
         }
         return obj.attrs.at(name);
     });

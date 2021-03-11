@@ -31,9 +31,6 @@ public:
     explicit LogItem(uint64_t time) : time(time) {}
     uint64_t time = 0;
 
-    // pointing to the log file
-    LogFile *file = nullptr;
-
     virtual ~LogItem() = default;
 
     // we support following types
@@ -104,6 +101,7 @@ public:
     }
 
     void get_item(LogItem *item, const LogIndex &index);
+    [[nodiscard]] const LogFormatParser::Format &format() const { return format_; };
 
 private:
     uint64_t batch_size_ = 1024;
