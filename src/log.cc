@@ -279,6 +279,7 @@ void LogItemBatch::get_items(const std::vector<LogItem *> &items) const {
         int_pos += int_size;
         float_pos += float_size;
         str_pos += str_size;
+        items[i]->format = &format_;
     }
 }
 

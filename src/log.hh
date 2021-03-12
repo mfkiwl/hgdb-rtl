@@ -31,7 +31,6 @@ public:
     [[nodiscard]] virtual LogItem parse(const std::string &content) = 0;
 
     LogFormatParser::Format format;
-
 };
 
 // since logs are semi-structured. we only pick a few attributes that share among different log
@@ -49,7 +48,7 @@ public:
     std::vector<std::string> str_values;
     std::vector<double> float_values;
 
-    LogFormatParser::Format *format;
+    const LogFormatParser::Format *format = nullptr;
 };
 
 // a batch of log items
@@ -91,7 +90,9 @@ public:
     uint64_t index;
 
     bool operator<(const LogIndex &other) const {
-        return batch_index < other.batch_index && index < other.index;
+        auto self = batch_index << 32u | index;
+        auto o = other.batch_index << 32u | other.index;
+        return self < o;
     }
 };
 

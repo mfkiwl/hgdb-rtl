@@ -2,6 +2,8 @@
 
 #include "fmt/format.h"
 
+std::map<hgdb::log::LogIndex, hgdb::log::LogItem> LogItem::cached_items_;
+
 std::map<std::string, pybind11::object> LogItem::values() const {
     hgdb::log::LogItem item = get_item();
     std::map<std::string, pybind11::object> result{{"time", py::cast(item.time)}};
@@ -152,8 +154,14 @@ void init_parser(py::module &m) {
 
     auto scan = py::class_<hgdb::log::LogPrintfParser, hgdb::log::LogFormatParser,
                            std::shared_ptr<hgdb::log::LogPrintfParser>>(m, "LogPrintfParser");
-    scan.def(py::init<const std::string &, const std::vector<std::string> &>(), py::arg("format"),
-             py::arg("attr_names"));
+    scan.def(py::init([](const std::string &format, const std::vector<std::string> &attr_names) {
+                 auto parser = hgdb::log::LogPrintfParser(format, attr_names);
+                 if (parser.has_error()) {
+                     throw py::value_error("Unable to parse given format");
+                 }
+                 return parser;
+             }),
+             py::arg("format"), py::arg("attr_names"));
 }
 
 void init_log(py::module &m) {
