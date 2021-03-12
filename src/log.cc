@@ -23,14 +23,6 @@ LogFile::~LogFile() {
     }
 }
 
-void LogDatabase::add_file(const std::string &filename) {
-    log_files_.emplace_back(std::make_unique<LogFile>(filename));
-}
-
-void LogDatabase::add_file(std::istream &stream) {
-    log_files_.emplace_back(std::make_unique<LogFile>(stream));
-}
-
 LogPrintfParser::LogPrintfParser(const std::string &format,
                                  const std::vector<std::string> &attr_names)
     : time_index_(std::numeric_limits<uint64_t>::max()) {
@@ -68,7 +60,7 @@ LogPrintfParser::LogPrintfParser(const std::string &format,
                 i--;
             }
         }
-        if (add_format) format_.emplace(name, std::make_pair(type, index));
+        if (add_format) this->format.emplace(name, std::make_pair(type, index));
     }
 }
 
@@ -335,29 +327,39 @@ std::unique_ptr<LogItemBatch> compress(const LogPrintfParser::Format &format,
     return ptr;
 }
 
-void LogDatabase::parse(LogFormatParser &parser) {
+void LogDatabase::parse(const std::string &filename, LogFormatParser &parser) {
+    LogFile file(filename);
+    parse(file, parser);
+}
+
+void LogDatabase::parse(std::istream &stream, LogFormatParser &parser) {
+    LogFile file(stream);
+    parse(file, parser);
+}
+
+void LogDatabase::parse(LogFile &file, LogFormatParser &parser) {
     std::vector<LogItem> batch;
     batch.reserve(batch_size_);
-    format_ = parser.format();
+    formats_.emplace_back(parser.format);
+    auto *format = &formats_.back();
 
-    for (auto &file_ptr : log_files_) {
-        auto *file = file_ptr.get();
-        // we first parse the file to create raw files
-        std::string line;
-        if (file->stream->bad()) return;
-        // index the positions
-        while (std::getline(*file->stream, line)) {
-            if (line.empty()) continue;
-            auto item = parser.parse(line);
-            batch.emplace_back(item);
+    // we first parse the file to create raw files
+    std::string line;
+    if (file.stream->bad()) return;
+    // index the positions
+    while (std::getline(*file.stream, line)) {
+        if (line.empty()) continue;
+        auto item = parser.parse(line);
+        item.format = format;
+        batch.emplace_back(item);
 
-            if (batch.size() >= batch_size_) {
-                auto p = compress(format_, batch, item_index_, batches_.size());
-                if (p) batches_.emplace_back(std::move(p));
-            }
+        if (batch.size() >= batch_size_) {
+            auto p = compress(*format, batch, item_index_, batches_.size());
+            if (p) batches_.emplace_back(std::move(p));
         }
     }
-    auto p = compress(format_, batch, item_index_, batches_.size());
+
+    auto p = compress(*format, batch, item_index_, batches_.size());
     if (p) batches_.emplace_back(std::move(p));
 }
 

@@ -1,9 +1,11 @@
 #include "log.hh"
 
+#include "fmt/format.h"
+
 std::map<std::string, pybind11::object> LogItem::values() const {
     hgdb::log::LogItem item = get_item();
     std::map<std::string, pybind11::object> result{{"time", py::cast(item.time)}};
-    auto const fmt = db->format();
+    auto const fmt = *item.format;
     uint64_t int_values = 0, float_values = 0, str_values = 0;
     for (auto const &[name, value] : fmt) {
         auto const &[type, index] = value;
@@ -46,17 +48,116 @@ hgdb::log::LogItem LogItem::get_item() const {
     }
 }
 
+Log::Log() : DataSource(DataSourceType::Log) { db_ = std::make_unique<hgdb::log::LogDatabase>(); }
+
+void Log::add_file(const std::string &filename,
+                   const std::shared_ptr<hgdb::log::LogFormatParser> &parser) {
+    files_.emplace_back(std::make_pair(filename, parser));
+}
+
+void Log::on_added(Ooze *ooze) {
+    ooze_ = ooze;
+    for (auto const &[filename, parser] : files_) {
+        db_->parse(filename, *parser);
+    }
+}
+
+std::shared_ptr<QueryArray> Log::get_selector(py::handle handle) {
+    if (handle.is(py::type::of<LogItem>())) {
+        auto array = std::make_shared<QueryArray>(ooze_);
+        auto const &item_index = db_->item_index();
+        for (auto const &index : item_index) {
+            auto ptr = std::make_shared<LogItem>(ooze_, db_.get(), *index);
+            array->add(ptr);
+        }
+        return array;
+    }
+    return nullptr;
+}
+
 std::vector<py::handle> Log::provides() const { return {py::type::of<LogItem>()}; }
 
 void init_log_item(py::module &m) {
     auto item = py::class_<LogItem, QueryObject, std::shared_ptr<LogItem>>(m, "LogItem");
     item.def("__getattr__", [](const LogItem &item, const std::string &name) {
         auto log = item.get_item();
-        auto const &format = item.db->format();
+        auto const &format = *log.format;
         if (format.find(name) == format.end()) {
             throw GenericAttributeError(name);
         }
+        auto [type, index] = format.at(name);
+        switch (type) {
+            case hgdb::log::LogFormatParser::ValueType::Hex:
+            case hgdb::log::LogFormatParser::ValueType::Int:
+            case hgdb::log::LogFormatParser::ValueType::Time: {
+                return py::cast(log.int_values[index]);
+            }
+            case hgdb::log::LogFormatParser::ValueType::Float: {
+                return py::cast(log.float_values[index]);
+            }
+            case hgdb::log::LogFormatParser::ValueType::Str: {
+                return py::cast(log.str_values[index]);
+            }
+        }
+        throw GenericAttributeError(name);
     });
+    item.def_property_readonly("time", [](const LogItem &item) { return item.get_item().time; });
 }
 
-void init_log(py::module &m) { init_log_item(m); }
+void init_log_data_source(py::module &m) {
+    auto log = py::class_<Log, DataSource, std::shared_ptr<Log>>(m, "Log");
+    log.def(py::init<>());
+    log.def("add_file", &Log::add_file, py::arg("filename"), py::arg("parser"));
+}
+
+class PyLogParser : public hgdb::log::LogFormatParser {
+public:
+    using hgdb::log::LogFormatParser::LogFormatParser;
+
+    hgdb::log::LogItem parse(const std::string &content) override {
+        PYBIND11_OVERRIDE_PURE(hgdb::log::LogItem, hgdb::log::LogFormatParser, parse, content);
+    }
+};
+
+void init_parser(py::module &m) {
+    auto parser = py::class_<hgdb::log::LogFormatParser, PyLogParser,
+                             std::shared_ptr<hgdb::log::LogFormatParser>>(m, "LogFormatParser");
+    parser.def(py::init<>());
+    parser.def(
+        "set_format",
+        [](hgdb::log::LogFormatParser &parser,
+           std::vector<std::pair<std::string, py::object>> &types) {
+            // we generate the format underneath
+            uint64_t int_values = 0, float_values = 0, str_values = 0;
+            for (auto const &[name, obj] : types) {
+                if (std::string(obj.ptr()->ob_type->tp_name) == "int") {
+                    parser.format.emplace(
+                        name,
+                        std::make_pair(hgdb::log::LogFormatParser::ValueType::Int, int_values++));
+                } else if (std::string(obj.ptr()->ob_type->tp_name) == "float") {
+                    parser.format.emplace(
+                        name, std::make_pair(hgdb::log::LogFormatParser::ValueType::Float,
+                                             float_values++));
+                } else if (std::string(obj.ptr()->ob_type->tp_name) == "str") {
+                    parser.format.emplace(
+                        name,
+                        std::make_pair(hgdb::log::LogFormatParser::ValueType::Str, str_values++));
+                } else {
+                    throw py::value_error(fmt::format("Invalid type for {0}", name));
+                }
+            }
+        },
+        py::arg("formats"));
+    parser.def("parser", &hgdb::log::LogFormatParser::parse, py::arg("string_content"));
+
+    auto scan = py::class_<hgdb::log::LogPrintfParser, hgdb::log::LogFormatParser,
+                           std::shared_ptr<hgdb::log::LogPrintfParser>>(m, "LogPrintfParser");
+    scan.def(py::init<const std::string &, const std::vector<std::string> &>(), py::arg("format"),
+             py::arg("attr_names"));
+}
+
+void init_log(py::module &m) {
+    init_log_item(m);
+    init_log_data_source(m);
+    init_parser(m);
+}

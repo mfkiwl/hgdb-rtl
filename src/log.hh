@@ -23,6 +23,17 @@ public:
     ~LogFile();
 };
 
+class LogItem;
+class LogFormatParser {
+public:
+    enum class ValueType { Int, Hex, Str, Float, Time };
+    using Format = std::map<std::string, std::pair<ValueType, uint64_t>>;
+    [[nodiscard]] virtual LogItem parse(const std::string &content) = 0;
+
+    LogFormatParser::Format format;
+
+};
+
 // since logs are semi-structured. we only pick a few attributes that share among different log
 // structures. Notice that log items are directly instantiated from the io locations
 class LogItem {
@@ -37,14 +48,8 @@ public:
     std::vector<int64_t> int_values;
     std::vector<std::string> str_values;
     std::vector<double> float_values;
-};
 
-class LogFormatParser {
-public:
-    enum class ValueType { Int, Hex, Str, Float, Time };
-    using Format = std::map<std::string, std::pair<ValueType, uint64_t>>;
-    [[nodiscard]] virtual Format format() const = 0;
-    [[nodiscard]] virtual LogItem parse(const std::string &content) = 0;
+    LogFormatParser::Format *format;
 };
 
 // a batch of log items
@@ -69,12 +74,10 @@ public:
 
     LogItem parse(const std::string &content) override;
 
-    LogFormatParser::Format format() const override { return format_; }
     [[nodiscard]] bool has_error() const { return error_; }
 
 private:
     void parse_format(const std::string &format);
-    LogFormatParser::Format format_;
     std::regex re_;
     bool error_ = false;
     uint64_t time_index_;
@@ -86,6 +89,10 @@ public:
     LogIndex(uint64_t batch_index, uint64_t index) : batch_index(batch_index), index(index) {}
     uint64_t batch_index;
     uint64_t index;
+
+    bool operator<(const LogIndex &other) const {
+        return batch_index < other.batch_index && index < other.index;
+    }
 };
 
 class LogDatabase {
@@ -93,26 +100,26 @@ public:
     LogDatabase() = default;
     explicit LogDatabase(uint64_t batch_size) : batch_size_(batch_size) {}
 
-    void add_file(const std::string &filename);
-    void add_file(std::istream &stream);
-    void parse(LogFormatParser &parser);
+    void parse(const std::string &filename, LogFormatParser &parser);
+    void parse(std::istream &stream, LogFormatParser &parser);
     [[nodiscard]] const std::vector<std::shared_ptr<LogIndex>> &item_index() const {
         return item_index_;
     }
 
     void get_item(LogItem *item, const LogIndex &index);
-    [[nodiscard]] const LogFormatParser::Format &format() const { return format_; };
 
 private:
     uint64_t batch_size_ = 1024;
     std::vector<std::unique_ptr<LogItemBatch>> batches_;
     std::vector<std::shared_ptr<LogIndex>> item_index_;
-    std::vector<std::unique_ptr<LogFile>> log_files_;
-    LogFormatParser::Format format_;
 
     // we cache one decoded batch
     std::optional<uint64_t> cached_index_;
     std::vector<LogItem> cached_items_;
+
+    void parse(LogFile &file, LogFormatParser &parser);
+
+    std::vector<LogFormatParser::Format> formats_;
 };
 
 }  // namespace hgdb::log

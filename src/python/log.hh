@@ -6,9 +6,9 @@
 
 class LogItem : public QueryObject {
 public:
-    LogItem(Ooze* ooze, hgdb::log::LogDatabase* db, const hgdb::log::LogIndex& index)
+    LogItem(Ooze *ooze, hgdb::log::LogDatabase *db, const hgdb::log::LogIndex &index)
         : QueryObject(ooze), db(db), index(index) {}
-    hgdb::log::LogDatabase* db;
+    hgdb::log::LogDatabase *db;
     hgdb::log::LogIndex index;
     std::map<std::string, pybind11::object> values() const override;
 
@@ -21,11 +21,25 @@ private:
 
 class Log : public DataSource {
 public:
-    Log(): DataSource(DataSourceType::Log) {}
+    Log();
     [[nodiscard]] std::vector<py::handle> provides() const override;
 
-private:
+    std::shared_ptr<QueryArray> get_selector(py::handle handle) override;
+    std::shared_ptr<QueryObject> bind(const std::shared_ptr<QueryObject> &,
+                                      const py::object &) override {
+        return nullptr;
+    }
 
+    void add_file(const std::string &filename,
+                  const std::shared_ptr<hgdb::log::LogFormatParser> &parser);
+
+    void on_added(Ooze *ooze) override;
+
+private:
+    Ooze *ooze_ = nullptr;
+    std::vector<std::pair<std::string, std::shared_ptr<hgdb::log::LogFormatParser>>> files_;
+    std::unique_ptr<hgdb::log::LogDatabase> db_;
+    std::vector<std::shared_ptr<hgdb::log::LogFormatParser>> parser_;
 };
 
 #endif  // HGDB_RTL_PYTHON_LOG_HH

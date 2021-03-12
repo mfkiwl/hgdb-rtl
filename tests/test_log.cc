@@ -6,6 +6,8 @@
 
 class DummyParser : public hgdb::log::LogFormatParser {
 public:
+    DummyParser() { format = get_format(); }
+
     [[nodiscard]] hgdb::log::LogItem parse(const std::string &content) override {
         hgdb::log::LogItem item(count_);
         item.int_values = {count_, count_ * 10, count_ * 20};
@@ -15,7 +17,7 @@ public:
         return item;
     }
 
-    [[nodiscard]] std::map<std::string, std::pair<ValueType, uint64_t>> format() const override {
+    static std::map<std::string, std::pair<ValueType, uint64_t>> get_format() {
         std::map<std::string, std::pair<ValueType, uint64_t>> result;
         result["a"] = {hgdb::log::LogFormatParser::ValueType::Int, 0};
         result["b"] = {hgdb::log::LogFormatParser::ValueType::Float, 1};
@@ -39,9 +41,8 @@ TEST(log, test_parsing) {  // NOLINT
         ss << i << std::endl;
     }
     hgdb::log::LogDatabase db;
-    db.add_file(ss);
     DummyParser parser;
-    db.parse(parser);
+    db.parse(ss, parser);
     hgdb::log::LogItem item;
     db.get_item(&item, hgdb::log::LogIndex{0, 42});
     EXPECT_EQ(item.time, 42);
@@ -56,9 +57,8 @@ TEST(log, test_printf) {  // NOLINT
         ss << fmt::format("@{0} PROC: {1} 0x{2:08X} aa.bb.cc", i + 1, i, i + 2) << std::endl;
     }
     hgdb::log::LogDatabase db;
-    db.add_file(ss);
     auto parser = hgdb::log::LogPrintfParser("@%t PROC: %0d 0x%08X %m", {"proc", "value", "inst"});
-    db.parse(parser);
+    db.parse(ss, parser);
 
     hgdb::log::LogItem item;
     db.get_item(&item, hgdb::log::LogIndex{0, 42});
