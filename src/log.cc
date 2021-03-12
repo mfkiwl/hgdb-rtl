@@ -328,25 +328,27 @@ std::unique_ptr<LogItemBatch> compress(const LogPrintfParser::Format &format,
     return ptr;
 }
 
-void LogDatabase::parse(const std::string &filename, LogFormatParser &parser) {
+std::set<uint64_t> LogDatabase::parse(const std::string &filename, LogFormatParser &parser) {
     LogFile file(filename);
-    parse(file, parser);
+    return parse(file, parser);
 }
 
-void LogDatabase::parse(std::istream &stream, LogFormatParser &parser) {
+std::set<uint64_t> LogDatabase::parse(std::istream &stream, LogFormatParser &parser) {
     LogFile file(stream);
-    parse(file, parser);
+    return parse(file, parser);
 }
 
-void LogDatabase::parse(LogFile &file, LogFormatParser &parser) {
+std::set<uint64_t> LogDatabase::parse(LogFile &file, LogFormatParser &parser) {
+    std::set<uint64_t> result;
     std::vector<LogItem> batch;
     batch.reserve(batch_size_);
     formats_.emplace_back(parser.format);
     auto *format = &formats_.back();
+    uint64_t start_idx = batches_.size();
 
     // we first parse the file to create raw files
     std::string line;
-    if (file.stream->bad()) return;
+    if (file.stream->bad()) return {};
     // index the positions
     while (std::getline(*file.stream, line)) {
         if (line.empty()) continue;
@@ -362,6 +364,12 @@ void LogDatabase::parse(LogFile &file, LogFormatParser &parser) {
 
     auto p = compress(*format, batch, item_index_, batches_.size());
     if (p) batches_.emplace_back(std::move(p));
+
+    uint64_t end_idx = batches_.size();
+    for (uint64_t i = start_idx; i< end_idx; i++) {
+        result.emplace(i);
+    }
+    return result;
 }
 
 void LogDatabase::get_item(LogItem *item, const LogIndex &index) {

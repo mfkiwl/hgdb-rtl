@@ -39,7 +39,9 @@ private:
     Ooze *ooze_ = nullptr;
     std::vector<std::pair<std::string, std::shared_ptr<hgdb::log::LogFormatParser>>> files_;
     std::unique_ptr<hgdb::log::LogDatabase> db_;
-    std::vector<std::shared_ptr<hgdb::log::LogFormatParser>> parser_;
+    std::vector<std::shared_ptr<hgdb::log::LogFormatParser>> parsers_;
+    // record the batch indices
+    std::vector<std::set<uint64_t>> parser_batches_;
 };
 
 #endif  // HGDB_RTL_PYTHON_LOG_HH

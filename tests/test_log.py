@@ -14,9 +14,13 @@ def test_log_parsing():
         log.add_file(file, parser)
         o = Ooze()
         o.add_source(log)
-        res = o.select(LogItem)
-        assert res[42].time == 42
-        assert res[42].value == 42
+    res = o.select(LogItem)
+    assert res[42].time == 42
+    assert res[42].value == 42
+    # selecting using parser types
+    res = o.select(parser.TYPE)
+    assert len(res) == 100
+    assert res[43].value == 43
 
 
 if __name__ == "__main__":

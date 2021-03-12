@@ -55,16 +55,36 @@ Log::Log() : DataSource(DataSourceType::Log) { db_ = std::make_unique<hgdb::log:
 void Log::add_file(const std::string &filename,
                    const std::shared_ptr<hgdb::log::LogFormatParser> &parser) {
     files_.emplace_back(std::make_pair(filename, parser));
+    parsers_.emplace_back(parser);
 }
 
 void Log::on_added(Ooze *ooze) {
     ooze_ = ooze;
     for (auto const &[filename, parser] : files_) {
-        db_->parse(filename, *parser);
+        auto parser_index = db_->parse(filename, *parser);
+        parser_batches_.emplace_back(parser_index);
     }
 }
 
 std::shared_ptr<QueryArray> Log::get_selector(py::handle handle) {
+    // try out specific types first
+    for (auto i = 0u; i < parsers_.size(); i++) {
+        auto obj = py::cast(parsers_[i]);
+        if (handle.is(obj)) {
+            // linear scan on item index and only pick the ones with batch index
+            auto const &item_index = db_->item_index();
+            auto const &batch_index = parser_batches_[i];
+            auto array = std::make_shared<QueryArray>(ooze_);
+            for (auto const &index : item_index) {
+                if (batch_index.find(index->batch_index) != batch_index.end()) {
+                    auto ptr = std::make_shared<LogItem>(ooze_, db_.get(), *index);
+                    array->add(ptr);
+                }
+            }
+            return array;
+        }
+    }
+
     if (handle.is(py::type::of<LogItem>())) {
         auto array = std::make_shared<QueryArray>(ooze_);
         auto const &item_index = db_->item_index();
@@ -77,7 +97,14 @@ std::shared_ptr<QueryArray> Log::get_selector(py::handle handle) {
     return nullptr;
 }
 
-std::vector<py::handle> Log::provides() const { return {py::type::of<LogItem>()}; }
+std::vector<py::handle> Log::provides() const {
+    std::vector<py::handle> result;
+    for (auto const &parser : parsers_) {
+        result.emplace_back(py::cast(parser));
+    }
+    result.emplace_back(py::type::of<LogItem>());
+    return result;
+}
 
 void init_log_item(py::module &m) {
     auto item = py::class_<LogItem, QueryObject, std::shared_ptr<LogItem>>(m, "LogItem");
@@ -151,6 +178,8 @@ void init_parser(py::module &m) {
         },
         py::arg("formats"));
     parser.def("parser", &hgdb::log::LogFormatParser::parse, py::arg("string_content"));
+    parser.def_property_readonly(
+        "TYPE", [](const hgdb::log::LogFormatParser &parser) { return py::cast(parser); });
 
     auto scan = py::class_<hgdb::log::LogPrintfParser, hgdb::log::LogFormatParser,
                            std::shared_ptr<hgdb::log::LogPrintfParser>>(m, "LogPrintfParser");

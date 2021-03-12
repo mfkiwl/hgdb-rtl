@@ -3,6 +3,8 @@
 void Ooze::add_source(const std::shared_ptr<DataSource> &source) {
     // need to register provider type
     sources.emplace_back(source);
+    // add it first so that the source can generate the provide types on the fly
+    source->on_added(this);
     // register selected type
     auto const types = source->provides();
     auto func = [=](py::handle handle) -> std::shared_ptr<QueryArray> {
@@ -12,7 +14,6 @@ void Ooze::add_source(const std::shared_ptr<DataSource> &source) {
         // need to register selector object
         selector_providers.emplace_back(SelectorProvider{source.get(), t, func});
     }
-    source->on_added(this);
 }
 
 std::shared_ptr<QueryObject> bind(DataSource *src, const std::shared_ptr<QueryObject> &obj,

@@ -101,8 +101,8 @@ public:
     LogDatabase() = default;
     explicit LogDatabase(uint64_t batch_size) : batch_size_(batch_size) {}
 
-    void parse(const std::string &filename, LogFormatParser &parser);
-    void parse(std::istream &stream, LogFormatParser &parser);
+    std::set<uint64_t> parse(const std::string &filename, LogFormatParser &parser);
+    std::set<uint64_t> parse(std::istream &stream, LogFormatParser &parser);
     [[nodiscard]] const std::vector<std::shared_ptr<LogIndex>> &item_index() const {
         return item_index_;
     }
@@ -118,7 +118,7 @@ private:
     std::optional<uint64_t> cached_index_;
     std::vector<LogItem> cached_items_;
 
-    void parse(LogFile &file, LogFormatParser &parser);
+    std::set<uint64_t> parse(LogFile &file, LogFormatParser &parser);
 
     std::vector<LogFormatParser::Format> formats_;
 };
