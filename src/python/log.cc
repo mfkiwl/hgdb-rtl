@@ -68,25 +68,24 @@ void Log::on_added(Ooze *ooze) {
 
 std::shared_ptr<QueryArray> Log::get_selector(py::handle handle) {
     // try out specific types first
+    auto array = std::make_shared<QueryArray>(ooze_);
     for (auto i = 0u; i < parsers_.size(); i++) {
         auto obj = py::cast(parsers_[i]);
         if (handle.is(obj)) {
             // linear scan on item index and only pick the ones with batch index
             auto const &item_index = db_->item_index();
             auto const &batch_index = parser_batches_[i];
-            auto array = std::make_shared<QueryArray>(ooze_);
             for (auto const &index : item_index) {
                 if (batch_index.find(index->batch_index) != batch_index.end()) {
                     auto ptr = std::make_shared<LogItem>(ooze_, db_.get(), *index);
                     array->add(ptr);
                 }
             }
-            return array;
         }
     }
+    if (!array->empty()) return array;
 
     if (handle.is(py::type::of<LogItem>())) {
-        auto array = std::make_shared<QueryArray>(ooze_);
         auto const &item_index = db_->item_index();
         for (auto const &index : item_index) {
             auto ptr = std::make_shared<LogItem>(ooze_, db_.get(), *index);
