@@ -105,6 +105,60 @@ std::vector<py::handle> Log::provides() const {
     return result;
 }
 
+auto log_item_init(const std::shared_ptr<hgdb::log::LogFormatParser> &parser,
+                   const py::kwargs &kwargs) {
+    hgdb::log::LogItem item;
+    item.format = &parser->format;
+    for (auto const &[name, value] : kwargs) {
+        auto str_name = name.cast<std::string>();
+        if (parser->format.find(str_name) == parser->format.end()) {
+            throw py::value_error(fmt::format(
+                "Unable to find {0}. Make sure you have the format setup via set_format()",
+                str_name));
+        }
+        auto const &[f_type, f_index] = parser->format.at(str_name);
+        auto expected_size = f_index + 1;
+        if (std::string(value.ptr()->ob_type->tp_name) == "int") {
+            // int type
+            auto v = value.cast<int64_t>();
+            if (f_type != hgdb::log::LogFormatParser::ValueType::Int) {
+                throw py::value_error(
+                    fmt::format("{0} is set to different type than int", str_name));
+            }
+
+            if (item.int_values.size() < expected_size) {
+                item.int_values.resize(expected_size);
+            }
+            item.int_values[f_index] = v;
+        } else if (std::string(value.ptr()->ob_type->tp_name) == "str") {
+            // str type
+            auto v = value.cast<std::string>();
+            if (f_type != hgdb::log::LogFormatParser::ValueType::Str) {
+                throw py::value_error(
+                    fmt::format("{0} is set to different type than str", str_name));
+            }
+
+            if (item.str_values.size() < expected_size) {
+                item.str_values.resize(expected_size);
+            }
+            item.str_values[f_index] = v;
+        } else if (std::string(value.ptr()->ob_type->tp_name) == "float") {
+            // float type
+            auto v = value.cast<double>();
+            if (f_type != hgdb::log::LogFormatParser::ValueType::Float) {
+                throw py::value_error(
+                    fmt::format("{0} is set to different type than float", str_name));
+            }
+
+            if (item.float_values.size() < expected_size) {
+                item.float_values.resize(expected_size);
+            }
+            item.float_values[f_index] = v;
+        }
+    }
+    return item;
+}
+
 void init_log_item(py::module &m) {
     auto item = py::class_<LogItem, QueryObject, std::shared_ptr<LogItem>>(m, "LogItem");
     item.def("__getattr__", [](const LogItem &item, const std::string &name) {
@@ -134,59 +188,8 @@ void init_log_item(py::module &m) {
     // the actual log item that customer parser needs to provide
     auto log =
         py::class_<hgdb::log::LogItem, std::shared_ptr<hgdb::log::LogItem>>(m, "ParsedLogItem");
-    log.def(py::init(
-        [](const std::shared_ptr<hgdb::log::LogFormatParser> &parser, const py::kwargs &kwargs) {
-            hgdb::log::LogItem item;
-            item.format = &parser->format;
-            for (auto const &[name, value] : kwargs) {
-                auto str_name = name.cast<std::string>();
-                if (parser->format.find(str_name) == parser->format.end()) {
-                    throw py::value_error(fmt::format(
-                        "Unable to find {0}. Make sure you have the format setup via set_format()",
-                        str_name));
-                }
-                auto const &[f_type, f_index] = parser->format.at(str_name);
-                auto expected_size = f_index + 1;
-                if (std::string(value.ptr()->ob_type->tp_name) == "int") {
-                    // int type
-                    auto v = value.cast<int64_t>();
-                    if (f_type != hgdb::log::LogFormatParser::ValueType::Int) {
-                        throw py::value_error(
-                            fmt::format("{0} is set to different type than int", str_name));
-                    }
-
-                    if (item.int_values.size() < expected_size) {
-                        item.int_values.resize(expected_size);
-                    }
-                    item.int_values[f_index] = v;
-                } else if (std::string(value.ptr()->ob_type->tp_name) == "str") {
-                    // str type
-                    auto v = value.cast<std::string>();
-                    if (f_type != hgdb::log::LogFormatParser::ValueType::Str) {
-                        throw py::value_error(
-                            fmt::format("{0} is set to different type than str", str_name));
-                    }
-
-                    if (item.str_values.size() < expected_size) {
-                        item.str_values.resize(expected_size);
-                    }
-                    item.str_values[f_index] = v;
-                } else if (std::string(value.ptr()->ob_type->tp_name) == "float") {
-                    // float type
-                    auto v = value.cast<double>();
-                    if (f_type != hgdb::log::LogFormatParser::ValueType::Float) {
-                        throw py::value_error(
-                            fmt::format("{0} is set to different type than float", str_name));
-                    }
-
-                    if (item.float_values.size() < expected_size) {
-                        item.float_values.resize(expected_size);
-                    }
-                    item.float_values[f_index] = v;
-                }
-            }
-            return item;
-        }));
+    log.def(py::init([](const std::shared_ptr<hgdb::log::LogFormatParser> &parser,
+                        const py::kwargs &kwargs) { return log_item_init(parser, kwargs); }));
     log.def_readwrite("time", &hgdb::log::LogItem::time);
 }
 
@@ -227,6 +230,9 @@ void init_parser(py::module &m) {
             } else {
                 throw py::value_error(fmt::format("Invalid type for {0}", name));
             }
+        }
+        if (types.size() != parser.format.size()) {
+            throw py::value_error("Missing parser value");
         }
     });
     parser.def("parse", &hgdb::log::LogFormatParser::parse, py::arg("string_content"));
