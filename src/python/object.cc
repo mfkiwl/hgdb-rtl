@@ -20,6 +20,13 @@ std::shared_ptr<QueryObject> QueryObject::map(
 QueryArray::QueryArray(Ooze *ooze, std::vector<std::shared_ptr<QueryObject>> array)
     : QueryObject(ooze), data(std::move(array)) {}
 
+QueryArray::QueryArray(const QueryArray &array) : QueryObject(array->ooze) {
+    data.reserve(array->size());
+    for (auto const &entry : array->data) {
+        data.emplace_back(entry);
+    }
+}
+
 std::shared_ptr<QueryObject> QueryArray::map(
     const std::function<std::shared_ptr<QueryObject>(QueryObject *)> &mapper) {
     auto result = std::make_shared<QueryArray>(ooze);
@@ -298,6 +305,43 @@ std::shared_ptr<QueryObject> object_when(
     return flatten_size_one_array(result);
 }
 
+std::shared_ptr<QueryArray> query_seq(
+    const std::shared_ptr<QueryArray> &base, const std::shared_ptr<QueryObject> &target,
+    const std::function<bool(const std::shared_ptr<QueryObject> &,
+                             const std::shared_ptr<QueryObject> &)> &predicate) {
+    // compute sequence
+    // this is essentially a cross product with filtering
+    auto result = std::make_shared<QueryArray>(base->ooze);
+    std::shared_ptr<QueryArray> target_array;
+    if (target->is_array()) {
+        target_array = std::reinterpret_pointer_cast<QueryArray>(target);
+    } else {
+        target_array = std::make_shared<QueryArray>(target->ooze);
+        target_array->add(target);
+    }
+
+    // now we perform cross-product
+    for (auto const &base_entry : base->data) {
+        std::shared_ptr<QueryArray> base_entry_array;
+        if (base_entry->is_array()) {
+            base_entry_array = std::reinterpret_pointer_cast<QueryArray>(base_entry);
+        } else {
+            base_entry_array = std::make_shared<QueryArray>(base_entry->ooze);
+            base_entry_array->add(base_entry);
+        }
+        for (auto const &target_entry : target_array->data) {
+            if (predicate(base_entry, target_entry)) {
+                // add it to the result
+                auto r = std::make_shared<QueryArray>(*base_entry_array);
+                r->add(target_entry);
+                result->add(r);
+            }
+        }
+    }
+
+    return result;
+}
+
 void init_query_object(py::module &m) {
     auto obj = py::class_<QueryObject, std::shared_ptr<QueryObject>>(m, "QueryObject");
     obj.def("map", &QueryObject::map);
@@ -385,6 +429,7 @@ void init_query_array(py::module &m) {
         }
         return py::str(list);
     });
+    array.def("seq", &query_seq, py::arg("other"), py::arg("predicate"));
 }
 
 void init_generic_query_object(py::module &m) {
