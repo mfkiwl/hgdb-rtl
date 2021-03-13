@@ -31,6 +31,21 @@ def test_type_conversion():
     assert array[0] == g_o
 
 
+def test_sequence():
+    o = Ooze()
+    array = []
+    for i in range(10):
+        array.append(o.object({"a": i, "b": i + 1}))
+    array = o.array(array)
+    items = array
+    array = array.seq(items, lambda pre, after: pre.a == after.b)
+    assert len(array) == 9
+    array = array.seq(items, lambda pre, after: pre[-1].a == after.b)
+    assert len(array) == 8
+    # [2, 1, 0]  [3, 2, 1]  [4, 3, 2]
+    assert array[2][-1].a == 2
+
+
 if __name__ == "__main__":
     from conftest import get_vector_file_fn
     test_join(get_vector_file_fn)

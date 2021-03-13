@@ -20,9 +20,9 @@ std::shared_ptr<QueryObject> QueryObject::map(
 QueryArray::QueryArray(Ooze *ooze, std::vector<std::shared_ptr<QueryObject>> array)
     : QueryObject(ooze), data(std::move(array)) {}
 
-QueryArray::QueryArray(const QueryArray &array) : QueryObject(array->ooze) {
-    data.reserve(array->size());
-    for (auto const &entry : array->data) {
+QueryArray::QueryArray(const QueryArray &array) : QueryObject(array.ooze) {
+    data.reserve(array.size());
+    for (auto const &entry : array.data) {
         data.emplace_back(entry);
     }
 }
@@ -420,6 +420,21 @@ void init_query_array(py::module &m) {
                 return array.get(index);
             },
             py::return_value_policy::reference)
+        .def("__getitem__",
+             [](const QueryArray &array, int64_t index) {
+                 if (index >= 0) {
+                     auto i = static_cast<uint64_t>(index);
+                     if (i >= array.size()) {
+                         throw py::index_error();
+                     }
+                     return array.get(i);
+                 } else {
+                     while (index < 0) {
+                         index += static_cast<int64_t>(array.size());
+                     }
+                     return array.get(static_cast<uint64_t>(index));
+                 }
+             })
         .def("__iter__", [](QueryArray &array) { return py::make_iterator(array.data); });
     array.def("__repr__", [](const QueryArray &array) {
         py::list list;
