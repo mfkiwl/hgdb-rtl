@@ -24,7 +24,7 @@ public:
     explicit QueryArray(Ooze *ooze_) : QueryObject(ooze_) {}
     QueryArray(Ooze *ooze, std::vector<std::shared_ptr<QueryObject>> array);
     // copy constructor
-    explicit QueryArray(const QueryArray &array);
+    QueryArray(const QueryArray &array);
 
     std::shared_ptr<QueryObject> map(
         const std::function<std::shared_ptr<QueryObject>(QueryObject *)> &mapper) override;

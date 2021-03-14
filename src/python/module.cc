@@ -10,6 +10,7 @@ void init_rtl(py::module &m);
 void init_query_helper_function(py::module &m);
 void init_vcd(py::module &m);
 void init_log(py::module &m);
+void init_transaction(py::module &m);
 
 PYBIND11_MODULE(ooze, m) {
     init_object(m);
@@ -18,4 +19,5 @@ PYBIND11_MODULE(ooze, m) {
     init_query_helper_function(m);
     init_vcd(m);
     init_log(m);
+    init_transaction(m);
 }
