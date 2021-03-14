@@ -1,4 +1,5 @@
-from ooze import Log, Ooze, LogPrintfParser, LogItem, LogFormatParser, ParsedLogItem, Transaction
+from ooze import Log, Ooze, LogPrintfParser, LogItem, LogFormatParser, ParsedLogItem, Transaction, to_transaction,\
+    Transactions
 import tempfile
 import os
 
@@ -86,5 +87,23 @@ def test_transaction():
     assert transactions[42].duration == 2
 
 
+def test_seq_optimized():
+    with tempfile.TemporaryDirectory() as temp:
+        file = os.path.join(temp, "test.log")
+        with open(file, "w+") as f:
+            for i in range(100):
+                f.write("{0} {0} {0} {1}\n".format(i, float(i)))
+        parser = CustomParser()
+        log = Log()
+        log.add_file(file, parser)
+        o = Ooze()
+        o.add_source(log)
+    res = o.select(parser.TYPE)
+    items = Transactions(res.map(to_transaction))
+    res = items.seq(items, lambda a, b: (a.a + 1) == b.a, 10)
+    res = res.seq(items, lambda a, b: (a[-1].a + 1) == b.a, 10)
+    assert res[42][-1].a == 44
+
+
 if __name__ == "__main__":
-    test_transaction()
+    test_seq_optimized()
