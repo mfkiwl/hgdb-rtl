@@ -1,19 +1,24 @@
-from ooze import Log, Ooze, LogPrintfParser, LogItem, LogFormatParser, ParsedLogItem
+from ooze import Log, Ooze, LogPrintfParser, LogItem, LogFormatParser, ParsedLogItem, Transaction
 import tempfile
 import os
 
 
+def setup_display_parsing(temp):
+    file = os.path.join(temp, "test.log")
+    with open(file, "w+") as f:
+        for i in range(100):
+            f.write("@{0} a.b.c: 0x{0:08X}\n".format(i))
+    parser = LogPrintfParser("@%t %m: 0x%08X", ["module", "value"])
+    log = Log()
+    log.add_file(file, parser)
+    o = Ooze()
+    o.add_source(log)
+    return o, parser
+
+
 def test_log_parsing():
     with tempfile.TemporaryDirectory() as temp:
-        file = os.path.join(temp, "test.log")
-        with open(file, "w+") as f:
-            for i in range(100):
-                f.write("@{0} a.b.c: 0x{0:08X}\n".format(i))
-        parser = LogPrintfParser("@%t %m: 0x%08X", ["module", "value"])
-        log = Log()
-        log.add_file(file, parser)
-        o = Ooze()
-        o.add_source(log)
+        o, parser = setup_display_parsing(temp)
     res = o.select(LogItem)
     assert res[42].time == 42
     assert res[42].value == 42
@@ -55,5 +60,31 @@ def test_custom_log_parser():
     assert res[42].c == 42.0
 
 
+def test_transaction():
+    with tempfile.TemporaryDirectory() as temp:
+        o, parser = setup_display_parsing(temp)
+    items = o.select(parser.TYPE)
+    seq = items.seq(items, lambda pre, after: (pre.value + 1) == after.value)
+    seq = seq.seq(items, lambda pre, after: (pre[-1].value + 1) == after.value)
+
+    class TransactionMapper:
+        def __init__(self):
+            self.id_count = 0
+
+        def get_transaction(self, obj):
+            t = Transaction(self.id_count, obj)
+            self.id_count += 1
+            return t
+
+    tm = TransactionMapper()
+
+    def get_transaction(obj):
+        return tm.get_transaction(obj)
+
+    transactions = seq.map(get_transaction)
+    assert transactions[42].id == 42
+    assert transactions[42].duration == 2
+
+
 if __name__ == "__main__":
-    test_custom_log_parser()
+    test_transaction()

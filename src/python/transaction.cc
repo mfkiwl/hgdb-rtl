@@ -39,7 +39,8 @@ uint64_t Transaction::duration() const {
 
 void init_transaction(py::module &m) {
     auto t = py::class_<Transaction, QueryArray, std::shared_ptr<Transaction>>(m, "Transaction");
-    t.def(py::init<uint64_t, const std::shared_ptr<QueryArray> &>());
+    t.def(py::init<uint64_t, const std::shared_ptr<QueryArray> &>(), py::arg("id"),
+          py::arg("array"));
     t.def_property_readonly("duration", &Transaction::duration);
 
     t.def_readwrite("id", &Transaction::id);
