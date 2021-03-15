@@ -14,6 +14,8 @@ public:
 
     hgdb::log::LogItem get_item() const;
 
+    static void clear_cache() { cached_items_.clear(); }
+
 private:
     static std::map<hgdb::log::LogIndex, hgdb::log::LogItem> cached_items_;
     auto static constexpr cache_size_ = 1 << 20;

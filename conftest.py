@@ -1,5 +1,6 @@
 import pytest
 import os
+import ooze
 
 
 def get_vector_file_fn(filename):
@@ -12,3 +13,8 @@ def get_vector_file_fn(filename):
 @pytest.fixture()
 def get_vector_file():
     return get_vector_file_fn
+
+
+@pytest.fixture(autouse=True)
+def clear_kratos_context():
+    ooze.clear_cache()
